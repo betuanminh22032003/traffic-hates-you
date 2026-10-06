@@ -63,14 +63,14 @@ export function makeRider(c) {
 /* ---------- people & animals ---------- */
 export function makeDog() {
   const g = new THREE.Group(), C = '#c98b4f';
-  const body = part(sph(1, 14), C); body.scale.set(22, 11, 11); body.position.y = 20; g.add(body);
+  const body = part(sph(1, 14).scale(22, 11, 11), C, { pos: [0, 20, 0] }); g.add(body);
   const head = new THREE.Group(); head.position.set(-22, 30, 0); g.add(head);
   head.add(part(sph(10, 12), C));
   head.add(part(box(10, 7, 9), '#d9a46b', { pos: [-9, -3, 0] }));
   head.add(part(sph(2.5, 8), '#2a1f1a', { pos: [-14, -1, 0], outline: false }));
   for (const z of [-6, 6]) {
     head.add(part(sph(1.8, 6), '#2a1f1a', { pos: [-5, 3, z * 1.05], outline: false }));
-    const ear = part(sph(1, 8), '#8a5a30', { pos: [3, 9, z] }); ear.scale.set(4, 8, 2); ear.rotation.z = 0.4; head.add(ear);
+    head.add(part(sph(1, 8).scale(4, 8, 2), '#8a5a30', { pos: [3, 9, z], rot: [0, 0, 0.4] }));
   }
   const legs = [];
   for (const [lx, z] of [[-12, -6], [-12, 6], [12, -6], [12, 6]]) {
@@ -308,7 +308,7 @@ export function makeBarrier(w = 50, h = 50) {
 
 export function makeBoat(w = 120) {
   const g = new THREE.Group();
-  const b = part(cyl(w / 2, w / 2 - 8, 20, 20), '#9b7a4a', { pos: [w / 2, 10, 0] }); b.scale.z = 0.8; g.add(b);
+  g.add(part(cyl(w / 2, w / 2 - 8, 20, 20).scale(1, 1, 0.8), '#9b7a4a', { pos: [w / 2, 10, 0] }));
   const rim = part(new THREE.TorusGeometry(w / 2 - 2, 3, 6, 24), '#6e5530', { pos: [w / 2, 20, 0], rot: [Math.PI / 2, 0, 0], outline: false }); rim.scale.y = 0.8; g.add(rim);
   return g;
 }
