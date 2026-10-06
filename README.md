@@ -1,6 +1,6 @@
 # Traffic Hates You – bản Sài Gòn 3D
 
-Game troll-platformer 3D: chạy xe máy tới công ty trước 8:00 qua 15 màn đường phố Sài Gòn. Thứ gì trên đường cũng ghét bạn: ổ gà tàng hình, đèn đỏ troll, cột điện đổ, chó không xích, bà cụ qua đường, xe buýt, ô tô mở cửa, đinh tặc, cục nóng máy lạnh rơi, cây đổ, triều cường, cổng công ty tự đóng... Chết là chuyện bình thường, mỗi lần chết đồng hồ chạy thêm 1 phút.
+Game troll-platformer 3D góc nhìn từ trên-sau lưng (kiểu Trees Hate You): chạy xe máy tới công ty trước 8:00 qua 15 màn đường phố Sài Gòn, tự do chạy tới, phanh, lách trái phải và nhảy. Thứ gì trên đường cũng ghét bạn: ổ gà tàng hình, đèn đỏ troll, cột điện đổ, chó không xích, bà cụ qua đường, xe buýt, ô tô mở cửa, đinh tặc, cục nóng máy lạnh rơi, cây đổ, triều cường, cổng công ty tự đóng... Chết là chuyện bình thường, mỗi lần chết đồng hồ chạy thêm 1 phút.
 
 ![Traffic Hates You](public/icons/og.png)
 
@@ -19,9 +19,10 @@ Game troll-platformer 3D: chạy xe máy tới công ty trước 8:00 qua 15 mà
 
 | Hành động | Bàn phím | Cảm ứng | Tay cầm |
 |---|---|---|---|
-| Chạy | → / D | ▶ | D-pad / cần trái |
-| Phanh, lùi | ← / A | ◀ | D-pad / cần trái |
-| Nhảy | Space / ↑ / W | ⤒ | A |
+| Chạy tới | ↑ / W | kéo cần gạt lên | cần trái / D-pad lên |
+| Phanh, lùi | ↓ / S | kéo cần gạt xuống | cần trái / D-pad xuống |
+| Lách trái / phải | ← → / A D | kéo cần gạt sang ngang | cần trái / D-pad |
+| Nhảy | Space (hoặc J, K) | nút ⤒ bên phải | A |
 | Chơi lại màn | R | menu tạm dừng | |
 | Tạm dừng | Esc / P | ❚❚ | Start |
 
@@ -96,13 +97,14 @@ public/                 manifest PWA, service worker, icon
 legacy-2d.html          bản prototype 2D ban đầu (không nằm trong bản build)
 ```
 
-Logic dùng tọa độ "pixel" như bản 2D cũ (x sang phải, y hướng xuống, mặt đường ở `G = 440`); phần vẽ 3D đổi sang trục Y hướng lên. Vì logic tất định nên bot trong `scripts/` có thể phát lại một lời giải và chứng minh màn đó qua được.
+Logic dùng tọa độ "pixel": x chạy dọc con đường, z ngang đường (lề ở `z = ±120`), độ cao giữ quy ước bản 2D cũ (y hướng xuống, mặt đường ở `G = 440`); phần vẽ 3D đổi sang trục Y hướng lên. Camera bám sau lưng người chơi. Vì logic tất định nên bot trong `scripts/` có thể phát lại một lời giải và chứng minh màn đó qua được.
 
 ## Thêm hoặc sửa màn
 
 1. Mở `src/game/levels.js`, thêm một phần tử vào `LEVELS` (`id`, `ch` = chương, `name`, `len` = chiều dài, `rain` nếu trời mưa, `build` trả về danh sách bẫy).
-2. Các bẫy có sẵn: `hole`, `light`, `pole`, `tree`, `manhole`, `dog`, `onc` (ngược chiều / vượt ẩu), `bus`, `flood`, `gate`, `finish`, `sign`, `car`, `fall` (máy lạnh, chậu kiểng, thép), `walker` (bà cụ), `cart` (xe bánh mì), `nails`, `banner`, `speedcam`, `plat` (thúng, ván, giàn giáo), `block`, `txt`.
-3. Thêm lời giải cho bot vào `scripts/solutions.mjs` rồi chạy `npm test`. Gỡ lỗi một màn: `node scripts/dbg.mjs <id>` in ra từng sự kiện.
+2. Mặc định bẫy chắn hết bề ngang đường; ổ gà, đinh, rào có thể chỉ chắn một phần bằng `z0`/`z1` (người chơi lách qua được). Ô tô, nắp cống, chó đặt theo `z`; xe ngược chiều, xe buýt và đồ rơi tự nhắm vào làn người chơi đang đi.
+3. Các bẫy có sẵn: `hole`, `light`, `pole`, `tree`, `manhole`, `dog`, `onc` (ngược chiều / vượt ẩu), `bus`, `flood`, `gate`, `finish`, `sign`, `car`, `fall` (máy lạnh, chậu kiểng, thép), `walker` (bà cụ), `cart` (xe bánh mì), `nails`, `banner`, `speedcam`, `plat` (thúng, ván, giàn giáo), `block`, `txt`.
+4. Thêm lời giải cho bot vào `scripts/solutions.mjs` rồi chạy `npm test`. Gỡ lỗi một màn: `node scripts/dbg.mjs <id>` in ra từng sự kiện.
 
 Số liệu vật lý tham khảo: tốc độ tối đa 6.5 px/khung (≈ 77 km/h trên đồng hồ), nhảy cao ≈ 140 px, nhảy xa ≈ 270 px khi chạy hết tốc; dây điện ở độ cao 305 px (chạm là giật điện).
 

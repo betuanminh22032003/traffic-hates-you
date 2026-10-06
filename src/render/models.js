@@ -1,7 +1,7 @@
 // Low-poly cartoon models built from primitives. Local units = logic px, Y up,
 // origin on the ground, facing +X unless noted.
 import * as THREE from 'three';
-import { part, box, cyl, sph, ico, limb, group, M, canvasTex, texMat, signTex, fontPx } from './toon.js';
+import { part, box, cyl, sph, ico, limb, group, M, canvasTex, texMat, signTex, fontPx, disposeTree } from './toon.js';
 
 const SKIN = '#f2c29b';
 
@@ -193,6 +193,7 @@ export function makeCart() {
 }
 
 /* ---------- street furniture ---------- */
+const LAMP_ON = {};
 export function makeTrafficLight() {
   const g = new THREE.Group();
   g.add(part(cyl(4, 5, 222, 10), '#59606b', { pos: [0, 111, 0] }));
@@ -200,9 +201,9 @@ export function makeTrafficLight() {
   const lamps = [];
   for (const [y, c] of [[286, '#ff3b30'], [261, '#ffcc00'], [236, '#34c759']]) {
     const off = M('#3a3a3a');
-    const on = new THREE.MeshBasicMaterial({ color: c });
+    const on = (LAMP_ON[c] ??= new THREE.MeshBasicMaterial({ color: c }));
     const m = new THREE.Mesh(sph(9, 12), off); m.position.set(0, y, 13); g.add(m);
-    const halo = new THREE.Mesh(new THREE.CircleGeometry(19, 20), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.35, depthWrite: false }));
+    const halo = new THREE.Mesh(new THREE.CircleGeometry(19, 20), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.35, depthWrite: false })); halo.material.userData.own = true;
     halo.position.set(0, y, 22); halo.visible = false; g.add(halo);
     lamps.push({ m, on, off, halo });
   }
@@ -297,12 +298,12 @@ export function makeBeam(w = 130) {
   return g;
 }
 
-export function makeBarrier(w = 50, h = 50) {
+export function makeBarrier(w = 50, h = 50, d = 220) {
   const g = new THREE.Group();
   const stripes = canvasTex(128, 32, (c, W, H) => { for (let i = 0; i < 8; i++) { c.fillStyle = i % 2 ? '#fff' : '#ff7b25'; c.beginPath(); c.moveTo(i * 20 - 10, H); c.lineTo(i * 20 + 6, 0); c.lineTo(i * 20 + 26, 0); c.lineTo(i * 20 + 10, H); c.fill(); } });
   stripes.wrapS = THREE.RepeatWrapping;
-  g.add(part(box(w, h * 0.42, 220), texMat(stripes), { pos: [w / 2, h * 0.72, 0] }));
-  for (const z of [-90, 90]) g.add(part(box(8, h, 8), '#ddd', { pos: [w / 2, h / 2, z] }));
+  g.add(part(box(w, h * 0.42, d), texMat(stripes), { pos: [w / 2, h * 0.72, 0] }));
+  for (let z = -d / 2 + 16; z <= d / 2 - 16; z += Math.max(40, (d - 32) / 3)) g.add(part(box(8, h, 8), '#ddd', { pos: [w / 2, h / 2, z] }));
   return g;
 }
 
@@ -312,37 +313,44 @@ export function makeBoat(w = 120) {
   const rim = part(new THREE.TorusGeometry(w / 2 - 2, 3, 6, 24), '#6e5530', { pos: [w / 2, 20, 0], rot: [Math.PI / 2, 0, 0], outline: false }); rim.scale.y = 0.8; g.add(rim);
   return g;
 }
-export function makePlank(w = 120, kind = 'board') {
+export function makePlank(w = 120, kind = 'board', d = 110) {
   const g = new THREE.Group();
   if (kind === 'scaffold') {
-    g.add(part(box(w, 12, 110), '#c9a46a', { pos: [w / 2, -6, 0] }));
-    g.add(part(box(w, 4, 112), '#f4d35e', { pos: [w / 2, -12, 0], outline: false }));
-    for (const x of [8, w - 8]) g.add(part(cyl(2, 2, 600, 6), '#666', { pos: [x, 300, -40], outline: false }));
-  } else g.add(part(box(w, 14, 110), '#a07a4a', { pos: [w / 2, -7, 0] }));
+    g.add(part(box(w, 12, d), '#c9a46a', { pos: [w / 2, -6, 0] }));
+    g.add(part(box(w, 4, d + 2), '#f4d35e', { pos: [w / 2, -12, 0], outline: false }));
+    for (const x of [8, w - 8]) for (const z of [-d / 2 + 6, d / 2 - 6]) g.add(part(cyl(1.5, 1.5, 600, 6), '#666', { pos: [x, 300, z], outline: false }));
+  } else g.add(part(box(w, 14, d), '#a07a4a', { pos: [w / 2, -7, 0] }));
   return g;
 }
 
 export function makeBalcony() {
   const g = new THREE.Group();
-  g.add(part(box(130, 12, 270), '#d9d2c3', { pos: [0, -6, -125] }));
-  for (let i = 0; i < 9; i++) g.add(part(cyl(1.5, 1.5, 26, 5), '#555', { pos: [-60 + i * 15, 13, 8], outline: false }));
-  g.add(part(box(130, 3, 3), '#555', { pos: [0, 26, 8], outline: false }));
+  // a balcony that illegally sticks out over the whole street
+  g.add(part(box(130, 12, 420), '#d9d2c3', { pos: [0, -6, -50] }));
+  for (let i = 0; i < 9; i++) g.add(part(cyl(1.5, 1.5, 26, 5), '#555', { pos: [-60 + i * 15, 13, 158], outline: false }));
+  for (let i = 0; i < 9; i++) g.add(part(cyl(1.5, 1.5, 26, 5), '#555', { pos: [-64, 13, -240 + i * 50], outline: false }));
+  g.add(part(box(130, 3, 3), '#555', { pos: [0, 26, 158], outline: false }));
+  g.add(part(box(3, 3, 400), '#555', { pos: [-64, 26, -42], outline: false }));
   return g;
 }
 
-export function makePostSign(label, { bg = '#2a9d8f', fg = '#fff', h = 170 } = {}) {
+// Overhead arch across the street (finish line / fake sign). Faces -X (toward the chase camera).
+export function makeArch(label, { bg = '#2a9d8f', fg = '#fff', h = 190, half = 132 } = {}) {
   const g = new THREE.Group();
-  g.add(part(cyl(4, 4, h, 8), '#8d6e63', { pos: [0, h / 2, 0] }));
-  const board = new THREE.Group(); board.position.set(0, h - 4, 0); g.add(board);
+  const posts = [];
+  for (const z of [-half, half]) { const p = new THREE.Group(); p.position.z = z; p.add(part(cyl(5, 5, h, 8), '#8d6e63', { pos: [0, h / 2, 0] })); g.add(p); posts.push(p); }
+  g.add(part(box(8, 8, half * 2), '#8d6e63', { pos: [0, h - 4, 0] }));
+  const board = new THREE.Group(); board.position.set(0, h - 30, 0); g.add(board);
   const setLabel = (s) => {
-    board.clear();
-    const tex = signTex(s, { w: 512, h: 96, bg, fg, size: 56 });
-    const wpx = Math.max(110, Math.min(260, s.length * 15 + 40));
-    board.add(part(box(wpx, 40, 8), bg));
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(wpx - 4, 36), texMat(tex)); face.position.z = 4.2; board.add(face);
+    for (const c of [...board.children]) { board.remove(c); disposeTree(c); }
+    const tex = signTex(s, { w: 768, h: 128, bg, fg, size: 76 });
+    const wpx = Math.max(150, Math.min(250, s.length * 18 + 50));
+    board.add(part(box(8, 46, wpx), bg));
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(wpx - 4, 42), texMat(tex)); face.rotation.y = -Math.PI / 2; face.position.x = -4.3; board.add(face);
+    const back = face.clone(); back.rotation.y = Math.PI / 2; back.position.x = 4.3; board.add(back);
   };
   setLabel(label);
-  return { g, setLabel };
+  return { g, setLabel, posts };
 }
 
 export function makeTireShop() {
@@ -367,7 +375,7 @@ export function makeSpeedSign() {
   cam.add(part(box(30, 16, 16), '#eee'));
   cam.add(part(cyl(5, 5, 6, 10), '#222', { pos: [-17, 0, 0], rot: [0, 0, Math.PI / 2] }));
   g.add(cam);
-  const flash = new THREE.Mesh(new THREE.CircleGeometry(40, 20), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+  const flash = new THREE.Mesh(new THREE.CircleGeometry(40, 20), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false })); flash.material.userData.own = true;
   flash.position.set(-24, 196, 12); g.add(flash);
   return { g, flash };
 }

@@ -5,6 +5,7 @@ import '@fontsource/baloo-2/latin-ext-800.css';
 import '@fontsource/baloo-2/vietnamese-600.css';
 import '@fontsource/baloo-2/vietnamese-800.css';
 import './style.css';
+import './polyfills.js';
 import { makeWorld, step, KMH } from './game/logic.js';
 import { LEVELS, CHAPTERS } from './game/levels.js';
 import { deathText, HEAD } from './game/messages.js';
@@ -21,7 +22,6 @@ const START_MIN = 6 * 60 + 30, PER_LEVEL_MIN = 5;
 const view = new View($('gl'), $('ov'));
 const quality = () => (S.settings.quality === 'auto' ? (isTouch ? 'medium' : 'high') : S.settings.quality);
 view.setQuality(quality());
-if (isTouch) view.padY = 80;
 view.touch = isTouch;
 
 /* ---------- state ---------- */
@@ -34,14 +34,19 @@ const theme = i => CHAPTERS[LEVELS[i].ch].theme;
 
 /* ---------- screens ---------- */
 const SCREENS = ['s-title', 's-select', 's-settings', 's-credits', 's-pause', 's-chapter', 's-end'];
+const visibleScreen = () => SCREENS.find(s => !$(s).classList.contains('hidden'));
 function show(id) {
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== id);
-  const f = id && $(id).querySelector('button:not(.hidden)');
+  if (!id) { document.activeElement?.blur?.(); return; }
+  const f = $(id).querySelector('button:not(.hidden):not(:disabled)');
   if (f && !isTouch) f.focus({ preventScroll: true });
 }
 function hideCards() { $('c-dead').classList.add('hidden'); $('c-clear').classList.add('hidden'); cardShown = false; }
 function setHud(on) { $('hud').classList.toggle('hidden', !on); $('touch').classList.toggle('hidden', !(on && isTouch)); }
 function toast(s) { const el = $('toast'); el.textContent = s; el.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.add('hidden'), 1800); }
+
+const runLevel = () => S.run.level ?? 0;
+const canContinue = () => runLevel() > 0 && runLevel() < LEVELS.length;
 
 function goTitle() {
   mode = 'title'; setHud(false); hideCards();
@@ -49,10 +54,9 @@ function goTitle() {
   view.attractMode = true;
   view.load(attractWorld, 'dawn');
   world = null;
-  const cont = S.unlocked > 1 && !(S.finished && S.unlocked > LEVELS.length);
-  $('b-play').textContent = cont ? `TIẾP TỤC · MÀN ${Math.min(S.unlocked, LEVELS.length)}` : 'CHƠI';
-  $('b-new').classList.toggle('hidden', !cont);
-  $('title-hint').textContent = isTouch ? '◀ ▶ chạy / phanh · ⤒ nhảy' : '→ chạy · ← phanh · SPACE nhảy · R chơi lại · ESC tạm dừng';
+  $('b-play').textContent = canContinue() ? `TIẾP TỤC · MÀN ${runLevel() + 1}` : 'CHƠI';
+  $('b-new').classList.toggle('hidden', !canContinue());
+  $('title-hint').textContent = isTouch ? 'Cần gạt trái: chạy & lách · nút phải: nhảy' : '↑ chạy · ↓ phanh · ← → lách · SPACE nhảy · R chơi lại · ESC tạm dừng';
   show('s-title');
   A.playMusic(0);
 }
@@ -71,7 +75,7 @@ function buildSelect() {
       b.innerHTML = locked ? `<b>🔒</b><span class="st">Màn ${L.id}</span>` :
         `<b>${L.id}</b>${L.name}<span class="st">${done ? `💀 ít nhất ${S.best[L.id] ?? 0}` : 'chưa qua'}</span>`;
       b.disabled = locked;
-      b.onclick = () => { A.sfx('click'); startLevel(i, true); };
+      b.onclick = () => { A.sfx('click'); startLevel(i, true, true); };
       grid.appendChild(b);
     });
     box.appendChild(grid); root.appendChild(box);
@@ -107,11 +111,7 @@ function toggleFullscreen() {
 }
 
 /* ---------- menu buttons ---------- */
-$('b-play').onclick = () => {
-  A.sfx('click');
-  if (S.unlocked > 1 && S.unlocked <= LEVELS.length) startLevel(S.unlocked - 1, true);
-  else newRun();
-};
+$('b-play').onclick = () => { A.sfx('click'); if (canContinue()) startLevel(runLevel(), true); else newRun(); };
 $('b-new').onclick = () => { A.sfx('click'); newRun(); };
 $('b-select').onclick = () => { A.sfx('click'); buildSelect(); returnTo = 's-title'; show('s-select'); };
 $('b-settings').onclick = () => { A.sfx('click'); refreshSettings(); returnTo = 's-title'; show('s-settings'); };
@@ -126,12 +126,15 @@ $('p-menu').onclick = () => { A.sfx('click'); goTitle(); };
 $('e-menu').onclick = () => { A.sfx('click'); goTitle(); };
 $('e-share').onclick = share;
 
-function newRun() { S.run = { deaths: 0, perLevel: {} }; save(); startLevel(0, true); }
+// A story run counts for the record only when it was played from level 1 in order.
+function newRun() { S.run = { deaths: 0, perLevel: {}, level: 0, full: true }; save(); startLevel(0, true); }
 
 /* ---------- level flow ---------- */
-function startLevel(i, intro) {
+function startLevel(i, intro, fromSelect = false) {
+  if (fromSelect && i !== runLevel()) S.run.full = false;
+  S.run.level = i; save();
   const chapterStart = i === 0 || LEVELS[i - 1].ch !== LEVELS[i].ch;
-  lvIdx = i; levelDeaths = 0;
+  lvIdx = i; levelDeaths = 0; jumpQueued = false;
   world = makeWorld(LEVELS[i]);
   view.attractMode = false;
   view.load(world, theme(i));
@@ -144,10 +147,15 @@ function startLevel(i, intro) {
   } else { show(null); mode = 'play'; }
 }
 
+function endChapterSplash() {
+  show(null); mode = 'play';
+  if (!document.hasFocus() || isPortraitBlocked()) pause(true);
+}
+
 function retry() {
   world = makeWorld(LEVELS[lvIdx]);
   view.reset(world);
-  hideCards(); mode = 'play'; show(null);
+  hideCards(); mode = 'play'; show(null); jumpQueued = false;
 }
 
 function onDeath() {
@@ -172,6 +180,7 @@ function onClear() {
   S.cleared[id] = true;
   S.best[id] = Math.min(S.best[id] ?? Infinity, levelDeaths);
   S.unlocked = Math.max(S.unlocked, id + 1);
+  S.run.level = lvIdx + 1;
   save();
 }
 function showClearCard() {
@@ -192,12 +201,18 @@ function ending() {
   mode = 'end'; setHud(false); hideCards();
   lvIdx = LEVELS.length;
   const m = clockMin(), late = m - 8 * 60;
-  S.finished++;
-  if (S.bestRun == null || S.run.deaths < S.bestRun) S.bestRun = S.run.deaths;
+  const full = !!S.run.full;
+  if (full) {
+    S.finished++;
+    if (S.bestRun == null || S.run.deaths < S.bestRun) S.bestRun = S.run.deaths;
+  }
+  S.run.level = LEVELS.length;
   save();
   $('end-time').textContent = `Tới công ty lúc ${fmt(m)}!`;
   $('end-late').textContent = late > 0 ? `(trễ ${late} phút... bị trừ lương)` : 'Đúng giờ! Siêu nhân thật sự!';
-  $('end-stats').innerHTML = `💀 Số lần chết: <b>${S.run.deaths}</b> · Kỷ lục: <b>${S.bestRun}</b><br>Tổng cộng đã chết ${S.totalDeaths} lần trên đường đi làm.`;
+  $('end-stats').innerHTML = `💀 Số lần chết: <b>${S.run.deaths}</b>` + (S.bestRun != null ? ` · Kỷ lục: <b>${S.bestRun}</b>` : '') +
+    (full ? '' : '<br><small>(Lượt này có chọn màn nên không tính kỷ lục)</small>') +
+    `<br>Tổng cộng đã chết ${S.totalDeaths} lần trên đường đi làm.`;
   show('s-end');
   A.sfx('win');
 }
@@ -211,16 +226,17 @@ async function share() {
 }
 
 function pause(on) {
-  if (on && (mode === 'play')) { mode = 'pause'; show('s-pause'); A.sfx('click'); }
+  jumpQueued = false;
+  if (on && mode === 'play') { mode = 'pause'; show('s-pause'); A.sfx('click'); }
   else if (!on && mode === 'pause') { mode = 'play'; show(null); A.sfx('click'); }
 }
 
 /* ---------- input ---------- */
-const keys = {}, touch = { l: false, r: false };
+const keys = {}, stick = { fwd: false, back: false, sl: false, sr: false };
 let jumpQueued = false;
-const JUMP = ['Space', 'ArrowUp', 'KeyW', 'KeyZ', 'KeyK'];
+const JUMP = ['Space', 'KeyJ', 'KeyK', 'KeyZ'];
 function anyAction() {
-  if (mode === 'chapter') { show(null); mode = 'play'; return true; }
+  if (mode === 'chapter') { endChapterSplash(); return true; }
   if (mode !== 'play' || !world) return false;
   if (world.status === 'dead' && world.deadT > 22) { retry(); return true; }
   if (world.status === 'clear' && world.clearT > 40) { nextLevel(); return true; }
@@ -228,7 +244,7 @@ function anyAction() {
 }
 addEventListener('keydown', (e) => {
   A.initAudio();
-  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code) && mode === 'play') e.preventDefault();
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code) && (mode === 'play' || mode === 'chapter')) e.preventDefault();
   if (e.repeat) return;
   keys[e.code] = true;
   if ((e.code === 'Escape' || e.code === 'KeyP') && (mode === 'play' || mode === 'pause')) { pause(mode === 'play'); return; }
@@ -237,32 +253,59 @@ addEventListener('keydown', (e) => {
   if (mode === 'play' && JUMP.includes(e.code)) jumpQueued = true;
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; touch.l = touch.r = false; if (mode === 'play') pause(true); });
+function releaseAll() { for (const k in keys) keys[k] = false; resetStick(); }
+addEventListener('blur', () => { releaseAll(); if (mode === 'play') pause(true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'play') pause(true); A.suspend(document.hidden); });
+// iOS only unlocks Web Audio inside touchend/click
+for (const ev of ['pointerdown', 'pointerup', 'click', 'touchend']) addEventListener(ev, () => A.initAudio(), { passive: true });
 
-function bindBtn(id, on, off) {
-  const el = $(id);
-  el.addEventListener('pointerdown', (e) => { e.preventDefault(); el.setPointerCapture?.(e.pointerId); A.initAudio(); el.classList.add('on'); on(); });
-  for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(t, () => { el.classList.remove('on'); off?.(); });
+// virtual joystick (left half of the screen) + jump button
+const zone = $('stickzone'), knob = $('knob'), ring = $('ring');
+let stickId = null, sx0 = 0, sy0 = 0;
+function resetStick() {
+  stickId = null; stick.fwd = stick.back = stick.sl = stick.sr = false;
+  ring.classList.remove('on'); knob.style.transform = 'translate(-50%,-50%)';
 }
-bindBtn('tl', () => (touch.l = true), () => (touch.l = false));
-bindBtn('tr', () => (touch.r = true), () => (touch.r = false));
-bindBtn('tj', () => { if (!anyAction() && mode === 'play') jumpQueued = true; });
-for (const id of ['c-dead', 'gl']) $(id).addEventListener('pointerdown', () => { A.initAudio(); anyAction(); });
-addEventListener('pointerdown', () => A.initAudio(), { once: true });
+zone.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (anyAction()) return;
+  stickId = e.pointerId; zone.setPointerCapture?.(e.pointerId);
+  sx0 = e.clientX; sy0 = e.clientY;
+  ring.style.left = sx0 + 'px'; ring.style.top = sy0 + 'px'; ring.classList.add('on');
+});
+zone.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== stickId) return;
+  const R = 56, dx = e.clientX - sx0, dy = e.clientY - sy0, d = Math.hypot(dx, dy), k = d > R ? R / d : 1;
+  knob.style.transform = `translate(calc(-50% + ${dx * k}px), calc(-50% + ${dy * k}px))`;
+  const nx = dx / R, ny = dy / R;
+  stick.fwd = ny < -0.3; stick.back = ny > 0.45; stick.sl = nx < -0.3; stick.sr = nx > 0.3;
+});
+for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) zone.addEventListener(t, (e) => { if (e.pointerId === stickId) resetStick(); });
+const jb = $('tj');
+jb.addEventListener('pointerdown', (e) => { e.preventDefault(); jb.classList.add('on'); if (!anyAction() && mode === 'play') jumpQueued = true; });
+for (const t of ['pointerup', 'pointercancel', 'pointerleave']) jb.addEventListener(t, () => jb.classList.remove('on'));
+for (const id of ['c-dead', 'gl']) $(id).addEventListener('pointerdown', () => anyAction());
 
-// gamepad
+// gamepad: play + menu navigation
 let padPrev = {};
 function pollPad() {
   const pads = navigator.getGamepads?.() || [];
   const gp = [...pads].find(Boolean);
-  if (!gp) return { l: false, r: false };
-  const ax = gp.axes[0] || 0, b = i => !!gp.buttons[i]?.pressed;
-  const now = { a: b(0) || b(1), start: b(9), l: ax < -0.4 || b(14), r: ax > 0.4 || b(15) };
-  if (now.a && !padPrev.a) { A.initAudio(); if (!anyAction() && mode === 'play') jumpQueued = true; }
-  if (now.start && !padPrev.start) pause(mode === 'play');
+  if (!gp) return {};
+  const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0, b = i => !!gp.buttons[i]?.pressed;
+  const now = { a: b(0) || b(1), start: b(9), up: ay < -0.5 || b(12), down: ay > 0.5 || b(13), left: ax < -0.4 || b(14), right: ax > 0.4 || b(15) };
+  const pressed = k => now[k] && !padPrev[k];
+  const scr = visibleScreen();
+  if (scr && mode !== 'chapter') {
+    const btns = [...$(scr).querySelectorAll('button:not(.hidden):not(:disabled)')];
+    const i = btns.indexOf(document.activeElement);
+    if (pressed('down') || pressed('right')) btns[(i + 1) % btns.length]?.focus();
+    if (pressed('up') || pressed('left')) btns[(i - 1 + btns.length) % btns.length]?.focus();
+    if (pressed('a')) { A.initAudio(); (btns.includes(document.activeElement) ? document.activeElement : btns[0])?.click(); }
+  } else if (pressed('a')) { A.initAudio(); if (!anyAction() && mode === 'play') jumpQueued = true; }
+  if (pressed('start')) pause(mode === 'play');
   padPrev = now;
-  return now;
+  return { fwd: now.up, back: now.down, sl: now.left, sr: now.right };
 }
 
 /* ---------- HUD ---------- */
@@ -277,24 +320,25 @@ function updateHud(force) {
   const m = clockMin();
   setText('hud-clock', `🕗 ${fmt(m)}`);
   $('hud-clock').classList.toggle('late', m >= 8 * 60);
-  const v = Math.round(Math.abs(world.p.vx) * KMH);
+  const v = Math.round(Math.hypot(world.p.vx, world.p.vz) * KMH);
   setText('hud-speed', `${v} km/h`);
   const cam = world.ents.find(e => e.k === 'speedcam' && !e.done);
   $('hud-speed').classList.toggle('over', !!cam && Math.abs(world.p.vx) > cam.lim);
 }
 
-/* ---------- orientation hint ---------- */
+/* ---------- orientation hint (only very narrow phones) ---------- */
+const isPortraitBlocked = () => isTouch && innerHeight > innerWidth * 1.9;
 function checkRotate() {
-  const portrait = isTouch && innerHeight > innerWidth * 1.05;
-  $('rotate').classList.toggle('hidden', !portrait);
-  if (portrait && mode === 'play') pause(true);
+  const blocked = isPortraitBlocked();
+  $('rotate').classList.toggle('hidden', !blocked);
+  if (blocked && mode === 'play') pause(true);
 }
 addEventListener('resize', checkRotate);
 
 /* ---------- loop ---------- */
 let last = performance.now(), acc = 0, t = 0;
 function tick(inp) {
-  view.prev = { x: world.p.x, y: world.p.y };
+  view.prev = { x: world.p.x, y: world.p.y, z: world.p.z };
   const wasPlay = world.status === 'play';
   step(world, inp, 1, (type, d) => {
     A.sfx(type === 'die' && d?.cause === 'zap' ? 'zap' : type);
@@ -304,11 +348,16 @@ function tick(inp) {
   if (wasPlay && world.status === 'clear') onClear();
 }
 
-function loop(now) {
+function frame(now) {
   const dt = Math.min(100, now - last) / 16.667; last = now; t += dt;
   const pad = pollPad();
-  const inp = { left: !!(keys.ArrowLeft || keys.KeyA || touch.l || pad.l), right: !!(keys.ArrowRight || keys.KeyD || touch.r || pad.r) };
-  if (mode === 'chapter') { chapterT += dt; if (chapterT > 110) { show(null); mode = 'play'; } }
+  const inp = {
+    fwd: !!(keys.ArrowUp || keys.KeyW || stick.fwd || pad.fwd),
+    back: !!(keys.ArrowDown || keys.KeyS || stick.back || pad.back),
+    sl: !!(keys.ArrowLeft || keys.KeyA || stick.sl || pad.sl),
+    sr: !!(keys.ArrowRight || keys.KeyD || stick.sr || pad.sr)
+  };
+  if (mode === 'chapter') { chapterT += dt; if (chapterT > 110) endChapterSplash(); }
   if (mode === 'play' && !frozen) {
     acc += dt; let n = 0;
     while (acc >= 1 && n < 5) { tick({ ...inp, jump: jumpQueued }); jumpQueued = false; acc -= 1; n++; }
@@ -317,11 +366,13 @@ function loop(now) {
     if (world.status === 'clear' && world.clearT > 8 && !cardShown) showClearCard();
     if (world.status === 'clear' && world.clearT > 130) nextLevel();
   }
-  if (world && mode !== 'title' && mode !== 'end') view.frame(world, mode === 'play' ? acc : 1, mode === 'play' ? dt : 0, t, inp);
-  else if (attractWorld && mode === 'title') view.attract(attractWorld, t, dt);
-  else if (world) view.frame(world, 1, 0, t, inp);
+  if (attractWorld && mode === 'title') view.attract(attractWorld, t, dt);
+  else if (world) view.frame(world, mode === 'play' ? acc : 1, mode === 'play' ? dt : 0, t, inp);
   if (mode === 'play' || mode === 'pause') updateHud();
-  requestAnimationFrame(loop);
+}
+function loop(now) {
+  requestAnimationFrame(loop); // schedule first so one bad frame can't freeze the game
+  try { frame(now); } catch (e) { console.error(e); }
 }
 
 /* ---------- boot ---------- */
@@ -332,7 +383,13 @@ function loop(now) {
   checkRotate();
   $('loading').classList.add('hidden');
   requestAnimationFrame(loop);
-  if ('serviceWorker' in navigator && import.meta.env.PROD) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && import.meta.env.PROD) {
+    navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then((reg) => {
+      // cache everything this first visit already downloaded, so offline works right away
+      const urls = performance.getEntriesByType('resource').map(r => r.name).filter(u => u.startsWith(location.origin));
+      reg.active?.postMessage({ type: 'precache', urls: [location.href, ...urls] });
+    }).catch(() => {});
+  }
 })();
 
 // test / debug hook

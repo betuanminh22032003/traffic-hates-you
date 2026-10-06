@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { part, box, cyl, ico, M, canvasTex, fontPx, settings, disposeTree } from './toon.js';
 import { makeTree, makeParkedBike, makeElectricPole } from './models.js';
 
-export const ROAD_Z = 120, WALK_Z = 260, WIRE_Z = -140;
+export const ROAD_Z = 120, WALK_Z = 260, WIRE_Z = -228;
 
 export const THEMES = {
   dawn: {
@@ -136,70 +136,72 @@ function bake(root) {
 
 /* ---------- builders ---------- */
 function buildRoad(root, x0, x1, holes, th) {
-  const gaps = holes.map(h => [h.x, h.x + h.w]).sort((a, b) => a[0] - b[0]);
-  const segs = []; let cur = x0;
-  for (const [a, b] of gaps) { if (a > cur) segs.push([cur, a]); cur = Math.max(cur, b); }
-  if (cur < x1) segs.push([cur, x1]);
-  for (const [a, b] of segs) {
-    const w = b - a, cx = (a + b) / 2;
-    root.add(part(box(w, 8, ROAD_Z * 2), th.road, { pos: [cx, -4, 0], outline: false, receive: true, shadow: false }));
-    root.add(part(box(w, 70, ROAD_Z * 2), '#7a5434', { pos: [cx, -43, 0], outline: false, shadow: false }));
-    // dashed lane line
-    for (let x = Math.ceil(a / 90) * 90; x + 48 < b; x += 90) root.add(part(box(48, 1, 6), '#ededed', { pos: [x + 24, 0.6, 62], outline: false, shadow: false }));
+  // Split the road into x-slices; inside a slice, holes cut z-ranges out of the asphalt.
+  const hz = h => [Math.max(-ROAD_Z, h.z), Math.min(ROAD_Z, h.z + h.d)];
+  const xs = [...new Set([x0, x1, ...holes.flatMap(h => [h.x, h.x + h.w])])].sort((a, b) => a - b);
+  for (let i = 0; i < xs.length - 1; i++) {
+    const a = xs[i], b = xs[i + 1], w = b - a, cx = (a + b) / 2;
+    if (w <= 0) continue;
+    const cuts = holes.filter(h => h.x < b && h.x + h.w > a).map(hz).sort((p, q) => p[0] - q[0]);
+    let z = -ROAD_Z;
+    const solid = [];
+    for (const [c0, c1] of cuts) { if (c0 > z) solid.push([z, c0]); z = Math.max(z, c1); }
+    if (z < ROAD_Z) solid.push([z, ROAD_Z]);
+    for (const [z0, z1] of solid) {
+      const d = z1 - z0, cz = (z0 + z1) / 2;
+      root.add(part(box(w, 8, d), th.road, { pos: [cx, -4, cz], outline: false, receive: true, shadow: false }));
+      root.add(part(box(w, 70, d), '#7a5434', { pos: [cx, -43, cz], outline: false, shadow: false }));
+    }
+    for (const [c0, c1] of cuts) {
+      const pit = new THREE.Mesh(box(w, 260, c1 - c0), pitMat());
+      pit.position.set(cx, -160, (c0 + c1) / 2); root.add(pit);
+    }
+    // dashed centre line + solid edge lines, skipping holes
+    if (!cuts.length) {
+      for (let x = Math.ceil(a / 90) * 90; x + 48 < b; x += 90) root.add(part(box(48, 1, 5), '#ededed', { pos: [x + 24, 0.6, 0], outline: false, shadow: false }));
+      for (const ez of [-ROAD_Z + 10, ROAD_Z - 10]) root.add(part(box(w, 1, 4), '#f4d35e', { pos: [cx, 0.6, ez], outline: false, shadow: false }));
+    }
   }
-  for (const [a, b] of gaps) {
-    const pit = new THREE.Mesh(box(b - a, 260, ROAD_Z * 2), pitMat());
-    pit.position.set((a + b) / 2, -160, 0); root.add(pit);
+  // sidewalks + curbs on both sides
+  const L = x1 - x0, cx = (x0 + x1) / 2, mid = (ROAD_Z + WALK_Z) / 2;
+  for (const s of [-1, 1]) {
+    root.add(part(box(L, 14, WALK_Z - ROAD_Z), th.walk, { pos: [cx, 7, s * mid], outline: false, receive: true, shadow: false }));
+    root.add(part(box(L, 300, WALK_Z - ROAD_Z), '#5a4a3a', { pos: [cx, -150, s * mid], outline: false, shadow: false }));
+    root.add(part(box(L, 16, 6), '#9a9590', { pos: [cx, 8, s * (ROAD_Z + 3)], outline: false, shadow: false }));
+    for (let x = Math.ceil(x0 / 48) * 48; x < x1; x += 48) root.add(part(box(1.5, 1, WALK_Z - ROAD_Z - 8), 'rgb(150,130,105)', { pos: [x, 14.2, s * mid], outline: false, shadow: false }));
   }
-  // sidewalks + curbs
-  const L = x1 - x0, cx = (x0 + x1) / 2;
-  root.add(part(box(L, 14, WALK_Z - ROAD_Z), th.walk, { pos: [cx, 7, -(ROAD_Z + WALK_Z) / 2], outline: false, receive: true, shadow: false }));
-  root.add(part(box(L, 300, WALK_Z - ROAD_Z), '#5a4a3a', { pos: [cx, -150, -(ROAD_Z + WALK_Z) / 2], outline: false, shadow: false }));
-  root.add(part(box(L, 16, 6), '#9a9590', { pos: [cx, 8, -ROAD_Z - 3], outline: false, shadow: false }));
-  root.add(part(box(L, 14, 80), th.walk, { pos: [cx, 7, ROAD_Z + 40], outline: false, receive: true, shadow: false }));
-  root.add(part(box(L, 300, 80), '#5a4a3a', { pos: [cx, -150, ROAD_Z + 40], outline: false, shadow: false }));
-  root.add(part(box(L, 16, 6), '#9a9590', { pos: [cx, 8, ROAD_Z + 3], outline: false, shadow: false }));
-  root.add(part(box(L, 120, 600), th.rain ? '#4f5a48' : '#6f8f4a', { pos: [cx, -53, ROAD_Z + 80 + 300], outline: false, shadow: false }));
-  // tile seams on the back sidewalk
-  for (let x = Math.ceil(x0 / 48) * 48; x < x1; x += 48) root.add(part(box(1.5, 1, WALK_Z - ROAD_Z - 8), 'rgb(150,130,105)', { pos: [x, 14.2, -(ROAD_Z + WALK_Z) / 2], outline: false, shadow: false }));
+  // the street keeps going beyond the level so the horizon isn't empty
+  root.add(part(box(3000, 8, WALK_Z * 2), th.road, { pos: [x1 + 1500, -4, 0], outline: false, shadow: false }));
 }
 
-function buildHouses(root, x0, x1, th, seed) {
+// One row of tube houses. side -1 = left of the street (fronts face +z), +1 = right (fronts face -z).
+function buildHouses(root, x0, x1, th, seed, side) {
   const T = textures();
   let x = x0, i = 0;
   while (x < x1) {
-    const r = k => hash(seed * 977 + i * 131 + k * 17);
+    const r = k => hash(seed * 977 + i * 131 + k * 17 + (side > 0 ? 50021 : 0));
     const bw = 86 + Math.floor(r(1) * 4) * 14;
     const h = 170 + Math.floor(r(2) * 6) * 32;
     const color = th.houses[Math.floor(r(3) * th.houses.length)];
-    const zf = -WALK_Z - r(4) * 12;
+    const zf = side * (WALK_Z + r(4) * 12);
     const d = 220;
     const g = new THREE.Group(); g.position.set(x + bw / 2, 0, zf);
-    // body
+    if (side > 0) g.rotation.y = Math.PI;
     g.add(part(box(bw, h, d), color, { pos: [0, h / 2, -d / 2], t: 1.8 }));
-    // upper facade (repeating floors)
     const floors = Math.max(1, Math.floor((h - 84) / 64));
     const fm = facadeMat(T.facade[Math.floor(r(5) * 2)], color);
     const fp = facePlane(bw - 10, floors * 64, fm, 1, floors); fp.position.set(0, 84 + floors * 32, 0.6); g.add(fp);
-    // roof lip
     g.add(part(box(bw + 6, 8, 16), color, { pos: [0, h, 4] }));
-    // ground floor: open shop or shutter
     const open = r(6) < 0.55;
     const gp = facePlane(bw - 16, 56, open ? shopMat() : shutterMat());
     gp.position.set(0, 28, 0.6); g.add(gp);
-    // shop sign from atlas
     if (r(7) < 0.75) {
       const idx = Math.floor(r(8) * SIGNS.length), n = SIGNS.length;
       const sp = facePlane(bw - 8, 22, atlasMat(), 1, 1, 1 - (idx + 1) / n, 1 - idx / n);
       sp.position.set(0, 70, 5); g.add(sp);
       g.add(part(box(bw - 4, 26, 6), '#2a1f1a', { pos: [0, 70, 1.5], outline: false, shadow: false }));
     }
-    // awning
-    if (r(9) < 0.5) {
-      const aw = part(box(bw - 6, 4, 46), ['#e63946', '#2a9d8f', '#f4a300', '#1d6fd8'][Math.floor(r(10) * 4)], { pos: [0, 60, 22], rot: [0.32, 0, 0] });
-      g.add(aw);
-    }
-    // AC units and plants on the floors
+    if (r(9) < 0.5) g.add(part(box(bw - 6, 4, 46), ['#e63946', '#2a9d8f', '#f4a300', '#1d6fd8'][Math.floor(r(10) * 4)], { pos: [0, 60, 22], rot: [0.32, 0, 0] }));
     for (let f = 0; f < floors; f++) {
       const fy = 84 + f * 64;
       if (r(20 + f) < 0.35) g.add(part(box(26, 18, 14), '#e8ecef', { pos: [bw / 2 - 20, fy + 12, 8] }));
@@ -218,37 +220,38 @@ const shutterMat = () => (_shutMat ??= new THREE.MeshToonMaterial({ map: texture
 const atlasMat = () => (_atlasMat ??= new THREE.MeshBasicMaterial({ map: textures().atlas }));
 
 function buildBackdrop(root, x0, x1, th, seed) {
-  // second row
-  for (let x = x0, i = 0; x < x1; i++) {
-    const w = 120 + hash(seed + i * 7) * 160, h = 260 + hash(seed + i * 13) * 340;
-    root.add(part(box(w, h, 120), th.far, { pos: [x + w / 2, h / 2, -720], outline: false, shadow: false }));
-    x += w + 20;
+  for (const s of [-1, 1]) {
+    // second row of taller buildings behind the houses
+    for (let x = x0, i = 0; x < x1 + 2500; i++) {
+      const w = 120 + hash(seed + i * 7 + s * 999) * 160, h = 300 + hash(seed + i * 13 + s * 999) * 380;
+      root.add(part(box(w, h, 200), th.far, { pos: [x + w / 2, h / 2, s * 620], outline: false, shadow: false }));
+      x += w + 20;
+    }
   }
-  // skyline
-  for (let x = x0 - 2000, i = 0; x < x1 + 2000; i++) {
-    const w = 160 + hash(seed + i * 29) * 260, h = (th.towers ? 500 : 340) + hash(seed + i * 31) * (th.towers ? 1100 : 500);
-    root.add(part(box(w, h, 200), th.farther, { pos: [x + w / 2, h / 2, -1500], outline: false, shadow: false }));
-    x += w + 60;
+  // skyline ahead, at the end of the street
+  for (let z = -2400, i = 0; z < 2400; i++) {
+    const w = 160 + hash(seed + i * 29) * 260, h = (th.towers ? 600 : 400) + hash(seed + i * 31) * (th.towers ? 1300 : 600);
+    root.add(part(box(200, h, w), th.farther, { pos: [x1 + 2600 + hash(i) * 400, h / 2, z + w / 2], outline: false, shadow: false }));
+    z += w + 40;
   }
   if (th.towers) {
     // a very tall landmark tower in the distance
-    for (const lx of [x0 + 900, x1 - 700]) {
-      root.add(part(box(160, 1500, 160), '#b9cfe0', { pos: [lx, 750, -1300], outline: false, shadow: false }));
-      root.add(part(box(110, 400, 110), '#c9dceb', { pos: [lx, 1700, -1300], outline: false, shadow: false }));
-      root.add(part(new THREE.ConeGeometry(55, 260, 4), '#d6e6f2', { pos: [lx, 2030, -1300], outline: false, shadow: false }));
-    }
+    root.add(part(box(160, 1500, 160), '#b9cfe0', { pos: [x1 + 2200, 750, -500], outline: false, shadow: false }));
+    root.add(part(box(110, 400, 110), '#c9dceb', { pos: [x1 + 2200, 1700, -500], outline: false, shadow: false }));
+    root.add(part(new THREE.ConeGeometry(55, 260, 4), '#d6e6f2', { pos: [x1 + 2200, 2030, -500], outline: false, shadow: false }));
   }
 }
 
 function buildWires(root, x0, x1) {
   const sp = 420;
   const tubes = [];
-  for (let x = Math.floor(x0 / sp) * sp + 200; x < x1; x += sp) {
+  for (const side of [-1, 1]) for (let x = Math.floor(x0 / sp) * sp + 200 + (side > 0 ? sp / 2 : 0); x < x1; x += sp) {
+    const WZ = side * -WIRE_Z;
     const pole = makeElectricPole(345);
-    pole.position.set(x, 0, WIRE_Z); root.add(pole);
+    pole.position.set(x, 0, WZ); root.add(pole);
     for (let k = 0; k < 5; k++) {
       const y = 330 - k * 6, sag = 30 + hash(x * 9 + k) * 18;
-      const a = new THREE.Vector3(x, y, WIRE_Z + (k - 2) * 3), b = new THREE.Vector3(x + sp, y, WIRE_Z + (k - 2) * 3);
+      const a = new THREE.Vector3(x, y, WZ + (k - 2) * 3), b = new THREE.Vector3(x + sp, y, WZ + (k - 2) * 3);
       const mid = a.clone().lerp(b, 0.5); mid.y -= sag * 2;
       tubes.push(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, mid, b), 14, 1.3, 4, false));
     }
@@ -258,16 +261,17 @@ function buildWires(root, x0, x1) {
 
 function buildStreetProps(root, x0, x1, th, seed) {
   let i = 0;
-  for (let x = x0 + 150; x < x1; x += 240) {
+  for (const s of [-1, 1]) for (let x = x0 + 150; x < x1; x += 240) {
     const r = k => hash(seed * 53 + i * 71 + k);
-    if (r(1) < 0.35) { const t = makeTree(170 + r(2) * 60); t.position.set(x + r(3) * 80, 14, -WALK_Z + 40); t.scale.setScalar(0.85); root.add(t); }
+    const zw = s * (WALK_Z - 40);
+    if (r(1) < 0.35) { const t = makeTree(170 + r(2) * 60); t.position.set(x + r(3) * 80, 14, zw); t.scale.setScalar(0.85); root.add(t); }
     else if (r(4) < 0.5) {
       const n = 1 + Math.floor(r(5) * 3);
-      for (let k = 0; k < n; k++) { const b = makeParkedBike(['#e63946', '#1d6fd8', '#f4f4f4', '#2b2b30', '#f4a300'][Math.floor(r(6 + k) * 5)]); b.position.set(x + k * 30, 14, -WALK_Z + 60 + k * 4); b.rotation.y = -1.2; root.add(b); }
+      for (let k = 0; k < n; k++) { const b = makeParkedBike(['#e63946', '#1d6fd8', '#f4f4f4', '#2b2b30', '#f4a300'][Math.floor(r(6 + k) * 5)]); b.position.set(x + k * 30, 14, zw - s * (20 + k * 4)); b.rotation.y = s * 1.2; root.add(b); }
     } else if (r(9) < 0.5) {
       // plastic stools + tea table (trà đá vỉa hè)
-      root.add(part(cyl(12, 12, 20, 10), '#1d6fd8', { pos: [x, 24, -WALK_Z + 60] }));
-      for (const dx of [-26, 26]) root.add(part(cyl(8, 8, 14, 8), '#e63946', { pos: [x + dx, 21, -WALK_Z + 64] }));
+      root.add(part(cyl(12, 12, 20, 10), '#1d6fd8', { pos: [x, 24, zw - s * 20] }));
+      for (const dx of [-26, 26]) root.add(part(cyl(8, 8, 14, 8), '#e63946', { pos: [x + dx, 21, zw - s * 16] }));
     }
     i++;
   }
@@ -291,7 +295,7 @@ function makeClouds(th) {
       const s = new THREE.Mesh(new THREE.SphereGeometry(60 + hash(i * 5 + k) * 50, 10, 8), mat);
       s.position.set(k * 70 - 100, hash(i * 3 + k) * 30, 0); s.scale.y = 0.6; c.add(s);
     }
-    c.position.set(i * 700 - 2400, 700 + hash(i) * 380, -2600);
+    c.position.set(2600 + hash(i * 7) * 900, 600 + hash(i) * 500, i * 700 - 2800);
     g.add(c);
   }
   return g;
@@ -299,16 +303,16 @@ function makeClouds(th) {
 
 function makeRain() {
   const N = 900, pos = new Float32Array(N * 6), seed = [];
-  for (let i = 0; i < N; i++) seed.push([Math.random() * 1800 - 900, Math.random() * 900, Math.random() * 900 - 500]);
+  for (let i = 0; i < N; i++) seed.push([Math.random() * 1600 - 800, Math.random() * 900, Math.random() * 1000 - 500]);
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xcfe3f5, transparent: true, opacity: 0.55 }));
   lines.frustumCulled = false;
-  lines.userData.update = (t, cx) => {
+  lines.userData.update = (t, cx, cz) => {
     for (let i = 0; i < N; i++) {
       const s = seed[i];
       const y = ((s[1] - t * 22) % 900 + 900) % 900 - 60;
-      const x = cx + s[0] - t * 3 % 40;
-      pos.set([x, y, s[2], x - 4, y + 26, s[2]], i * 6);
+      const x = cx + s[0], z = cz + s[2];
+      pos.set([x, y, z, x - 4, y + 26, z], i * 6);
     }
     g.attributes.position.needsUpdate = true;
   };
@@ -322,7 +326,8 @@ export function buildWorld(level, ents, theme) {
   const holes = ents.filter(e => e.k === 'hole');
   const raw = new THREE.Group();
   buildRoad(raw, x0, x1, holes, th);
-  buildHouses(raw, x0, x1, th, seed);
+  buildHouses(raw, x0, x1, th, seed, -1);
+  buildHouses(raw, x0, x1, th, seed, 1);
   buildBackdrop(raw, x0, x1, th, seed);
   buildWires(raw, x0, x1);
   buildStreetProps(raw, x0, x1, th, seed);
@@ -345,9 +350,9 @@ export function buildWorld(level, ents, theme) {
   return {
     root, th, sky,
     update(t, cam) {
-      clouds.position.x = cam.position.x * 0.85 + (t * 0.25) % 700;
-      if (sun) sun.position.set(cam.position.x * 0.97 + th.sunXY[0] * 2200, 450 + th.sunXY[1] * 1300, -3000);
-      if (rain) rain.userData.update(t, cam.position.x);
+      clouds.position.set(cam.position.x, 0, ((t * 0.25) % 700));
+      if (sun) { sun.position.set(cam.position.x + 3200, 300 + th.sunXY[1] * 1100, th.sunXY[0] * 2400); sun.lookAt(cam.position); }
+      if (rain) rain.userData.update(t, cam.position.x + 600, cam.position.z);
     },
     dispose() { disposeTree(root); sky.dispose(); }
   };

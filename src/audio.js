@@ -13,7 +13,7 @@ export function initAudio() {
       const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     } catch (e) { AC = null; }
   }
-  if (AC && AC.state === 'suspended') AC.resume();
+  if (AC && (AC.state === 'suspended' || AC.state === 'interrupted')) AC.resume();
   if (AC && want != null && !timer) playMusic(want);
 }
 

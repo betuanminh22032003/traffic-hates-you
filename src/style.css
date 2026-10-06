@@ -43,14 +43,18 @@ h2, .logo div, .head, .chap-no, .chap-name, .end-time, .pill, .btn {
 .pill.late { color: var(--red); }
 .pill.icon { pointer-events: auto; font-size: clamp(15px, 2.2vw, 20px); padding: 6px 12px; }
 
-/* ---------- touch pad ---------- */
-#touch { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-end;
-  padding: 0 calc(16px + var(--safe-r)) calc(16px + var(--safe-b)) calc(16px + var(--safe-l)); pointer-events: none; }
-#touch .grp { display: flex; gap: 14px; }
-.tb { pointer-events: auto; width: clamp(64px, 11vw, 92px); height: clamp(64px, 11vw, 92px); border-radius: 50%;
-  background: rgba(255,255,255,.14); border: 3px solid rgba(255,255,255,.55); color: #fff; font: 800 clamp(22px, 4vw, 32px) var(--font);
+/* ---------- touch controls: floating joystick (left half) + jump button ---------- */
+#touch { position: fixed; inset: 0; pointer-events: none; }
+#stickzone { position: absolute; left: 0; bottom: 0; width: 55%; height: 75%; pointer-events: auto; touch-action: none; }
+.stick-hint { position: absolute; left: calc(28px + var(--safe-l)); bottom: calc(24px + var(--safe-b)); font-weight: 700; font-size: 14px; opacity: .55; text-shadow: 0 2px 0 var(--ink); }
+#ring { position: fixed; left: 110px; top: calc(100% - 130px); width: 124px; height: 124px; margin: -62px 0 0 -62px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.45); background: rgba(255,255,255,.1); opacity: .45; pointer-events: none; transition: opacity .15s; }
+#ring.on { opacity: 1; }
+#knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,.55); border: 3px solid rgba(255,255,255,.9); transform: translate(-50%,-50%); }
+.tb { position: absolute; right: calc(20px + var(--safe-r)); bottom: calc(22px + var(--safe-b)); pointer-events: auto; border-radius: 50%;
+  background: rgba(255,255,255,.16); border: 3px solid rgba(255,255,255,.6); color: #fff; font: 800 clamp(26px, 5vw, 36px) var(--font);
   display: flex; align-items: center; justify-content: center; touch-action: none; }
-.tb.big { width: clamp(78px, 13vw, 110px); height: clamp(78px, 13vw, 110px); }
+.tb.big { width: clamp(84px, 14vw, 116px); height: clamp(84px, 14vw, 116px); }
 .tb.on { background: rgba(255,255,255,.5); transform: scale(.94); }
 
 /* ---------- screens ---------- */

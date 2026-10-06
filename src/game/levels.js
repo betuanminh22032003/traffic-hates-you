@@ -5,8 +5,8 @@ import { G } from './logic.js';
 const txt = (x, h, s, o = {}) => ({ k: 'txt', x, y: G - h, s, size: o.size ?? 22, color: o.color ?? '#fff' });
 const hole = (x, w, o = {}) => ({ k: 'hole', x, w, hidden: !!o.hidden, trig: o.trig, sign: !!o.sign, puddle: !!o.puddle });
 const light = (x, o = {}) => ({ k: 'light', x, fickle: !!o.fickle, trig: o.trig });
-const pole = (x, dir, trig, o = {}) => ({ k: 'pole', x, dir, trig, ...o });
-const tree = (x, dir, trig, o = {}) => ({ k: 'pole', kind: 'tree', x, dir, trig, len: 220, acc: 0.0035, wob: 16, ...o });
+const pole = (x, side, trig, o = {}) => ({ k: 'pole', x, side, trig, ...o });
+const tree = (x, side, trig, o = {}) => ({ k: 'pole', kind: 'tree', x, side, trig, len: 220, acc: 0.0035, wob: 16, ...o });
 const manhole = x => ({ k: 'manhole', x });
 const dog = (trig, x, o = {}) => ({ k: 'dog', trig, x, ...o });
 const onc = (trig, o = {}) => ({ k: 'onc', trig, ...o });
@@ -40,8 +40,9 @@ export const LEVELS = [
     txt(640, 150, 'Ổ gà kìa. Nhảy qua đi!', { size: 18 }),
     hole(600, 90, { sign: true }),
     hole(820, 100, { hidden: true, trig: 720 }),
-    txt(1120, 170, 'Ổ gà tàng hình. Quen dần đi.', { size: 18 }),
-    hole(1250, 90, { sign: true }),
+    txt(1080, 170, 'Ổ gà tàng hình. Quen dần đi.', { size: 18 }),
+    txt(1180, 200, 'Lách sang phải nè →', { size: 18, color: '#ffe066' }),
+    hole(1250, 110, { sign: true, z0: -140, z1: 30 }),
     finish(1550, 'ĐẦU HẺM')
   ] },
   { id: 2, ch: 0, name: 'Chó Nhà Ai', len: 2600, build: () => [
@@ -136,11 +137,11 @@ export const LEVELS = [
   ] },
   { id: 11, ch: 2, name: 'Kẹt Xe', len: 3500, rain: true, build: () => [
     txt(330, 230, 'Kẹt xe. Đi trên nóc xe cho nhanh.', { size: 18 }),
-    car(560, { color: '#2fa84f' }),
-    car(760, { color: '#f4f4f4' }),
-    car(960, { w: 220, h: 92, truck: true }),
+    car(560, { color: '#2fa84f', z: -60 }), car(560, { color: '#4d7cfe', z: 60 }),
+    car(760, { color: '#f4f4f4', z: -60 }), car(760, { color: '#f4d35e', z: 60 }),
+    car(960, { w: 220, h: 92, truck: true, z: -56 }), car(960, { w: 220, h: 92, truck: true, z: 56 }),
     hole(1180, 120),
-    car(1300, { color: '#e63946' }),
+    car(1300, { color: '#e63946', z: -60 }), car(1300, { color: '#8e44ad', z: 60 }),
     car(1680, { drive: 1470, dspeed: -3, range: 260, color: '#f4d35e' }),
     walker(2150, 1900, { pause: 40 }),
     banner(2600, { trig: 2380, drop: G - 70 }),
@@ -174,7 +175,7 @@ export const LEVELS = [
   { id: 14, ch: 3, name: 'Bãi Giữ Xe', len: 3800, build: () => [
     txt(330, 220, 'Sắp tới rồi! Cố lên!', { size: 22 }),
     txt(640, 300, 'Cột này nghiêng nghiêng...', { size: 16 }),
-    pole(720, 1, 768, { acc: 0.0025, len: 200, wob: 0 }),
+    pole(720, 1, 500, { acc: 0.0025, len: 250, wob: 0 }),
     hole(1100, 80, { sign: true }),
     hole(1300, 60, { hidden: true, trig: 1190 }),
     hole(1480, 80, { sign: true }),
@@ -188,7 +189,7 @@ export const LEVELS = [
   { id: 15, ch: 3, name: '8:00 Sáng', len: 4300, build: () => [
     txt(330, 230, 'Màn cuối. Không còn gì bất ngờ nữa đâu.', { size: 18 }),
     light(650),
-    walker(1080, 760, { zs: 0.06 }),
+    walker(1080, 760, { zs: 2.4 }),
     speedcam(1380),
     car(1500, { lane: 'curb', doorTrig: 1470 }),
     fall(1900, 1720, 'ac'),

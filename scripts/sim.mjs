@@ -14,36 +14,45 @@ import { makeWorld, step } from '../src/game/logic.js';
 //  ['STOP']        brake until stopped
 //  ['U', pred, mode]  hold mode ('r' | 'n' | 'l' | cruise speed number) until pred(w)
 //  ['UJ', pred, mode] hold mode until pred(w), then jump
+//  ['LANE', z]     from now on also steer toward z (null = stop steering)
 // After the last command the bot just holds right.
 export function makeBot(script) {
-  let i = 0, n = 0;
-  return function next(w) {
+  let i = 0, n = 0, lane = null;
+  const steer = (w, inp) => {
+    if (lane === null) return inp;
+    const dz = lane - w.p.z;
+    if (Math.abs(dz) < 4 && Math.abs(w.p.vz) < 1) return inp;
+    return { ...inp, sr: dz > 0, sl: dz < 0 };
+  };
+  return w => steer(w, next(w));
+  function next(w) {
     const p = w.p;
-    const speed = v => (p.vx < v ? { right: true } : p.vx > v + 0.6 ? { left: true } : {});
+    const speed = v => (p.vx < v ? { fwd: true } : p.vx > v + 0.6 ? { back: true } : {});
     for (;;) {
       const c = script[i];
-      if (!c) return { right: true };
+      if (!c) return { fwd: true };
       switch (c[0]) {
-        case 'R': if (p.x >= c[1]) { i++; continue; } return { right: true };
-        case 'RJ': if (p.x >= c[1]) { i++; return { right: true, jump: true }; } return { right: true };
+        case 'R': if (p.x >= c[1]) { i++; continue; } return { fwd: true };
+        case 'RJ': if (p.x >= c[1]) { i++; return { fwd: true, jump: true }; } return { fwd: true };
         case 'S': if (p.x >= c[2]) { i++; continue; } return speed(c[1]);
         case 'SJ': if (p.x >= c[2]) { i++; return { ...speed(c[1]), jump: true }; } return speed(c[1]);
         case 'SG': if (n > 3 && p.onGround) { n = 0; i++; continue; } n++; return speed(c[1]);
-        case 'J': i++; return { right: true, jump: true };
+        case 'J': i++; return { fwd: true, jump: true };
         case 'NJ': i++; return { jump: true };
         case 'W': if (n >= c[1]) { n = 0; i++; continue; } n++; return {};
-        case 'B': if (n >= c[1]) { n = 0; i++; continue; } n++; return { left: true };
-        case 'STOP': if (Math.abs(p.vx) < 0.3) { i++; continue; } return p.vx > 0 ? { left: true } : {};
+        case 'B': if (n >= c[1]) { n = 0; i++; continue; } n++; return { back: true };
+        case 'STOP': if (Math.abs(p.vx) < 0.3) { i++; continue; } return p.vx > 0 ? { back: true } : {};
         case 'U': case 'UJ': {
           const mode = c[2] ?? 'n';
-          const base = typeof mode === 'number' ? speed(mode) : mode === 'r' ? { right: true } : mode === 'l' ? { left: true } : {};
+          const base = typeof mode === 'number' ? speed(mode) : mode === 'r' ? { fwd: true } : mode === 'l' ? { back: true } : {};
           if (c[1](w)) { i++; if (c[0] === 'UJ') return { ...base, jump: true }; continue; }
           return base;
         }
+        case 'LANE': lane = c[1]; i++; continue;
         default: throw new Error('bad cmd ' + c[0]);
       }
     }
-  };
+  }
 }
 
 export function run(level, script, { maxT = 7000, trace = false } = {}) {
