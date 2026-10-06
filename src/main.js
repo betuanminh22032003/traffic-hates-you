@@ -56,7 +56,7 @@ function goTitle() {
   world = null;
   $('b-play').textContent = canContinue() ? `TIẾP TỤC · MÀN ${runLevel() + 1}` : 'CHƠI';
   $('b-new').classList.toggle('hidden', !canContinue());
-  $('title-hint').textContent = isTouch ? 'Cần gạt trái: chạy & lách · nút phải: nhảy' : '↑ chạy · ↓ phanh · ← → lách · SPACE nhảy · R chơi lại · ESC tạm dừng';
+  $('title-hint').textContent = isTouch ? 'Cần gạt trái: chạy 8 hướng · nút phải: nhảy' : '←↑→↓ / WASD chạy 8 hướng · SPACE nhảy · R chơi lại · ESC tạm dừng';
   show('s-title');
   A.playMusic(0);
 }
@@ -232,7 +232,7 @@ function pause(on) {
 }
 
 /* ---------- input ---------- */
-const keys = {}, stick = { fwd: false, back: false, sl: false, sr: false };
+const keys = {}, stick = { x: 0, y: 0 };
 let jumpQueued = false;
 const JUMP = ['Space', 'KeyJ', 'KeyK', 'KeyZ'];
 function anyAction() {
@@ -263,13 +263,13 @@ for (const ev of ['pointerdown', 'pointerup', 'click', 'touchend']) addEventList
 const zone = $('stickzone'), knob = $('knob'), ring = $('ring');
 let stickId = null, sx0 = 0, sy0 = 0;
 function resetStick() {
-  stickId = null; stick.fwd = stick.back = stick.sl = stick.sr = false;
+  stickId = null; stick.x = stick.y = 0;
   ring.classList.remove('on'); knob.style.transform = 'translate(-50%,-50%)';
 }
 zone.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   if (anyAction()) return;
-  stickId = e.pointerId; zone.setPointerCapture?.(e.pointerId);
+  stickId = e.pointerId; try { zone.setPointerCapture?.(e.pointerId); } catch (err) { /* synthetic pointer */ }
   sx0 = e.clientX; sy0 = e.clientY;
   ring.style.left = sx0 + 'px'; ring.style.top = sy0 + 'px'; ring.classList.add('on');
 });
@@ -277,8 +277,9 @@ zone.addEventListener('pointermove', (e) => {
   if (e.pointerId !== stickId) return;
   const R = 56, dx = e.clientX - sx0, dy = e.clientY - sy0, d = Math.hypot(dx, dy), k = d > R ? R / d : 1;
   knob.style.transform = `translate(calc(-50% + ${dx * k}px), calc(-50% + ${dy * k}px))`;
-  const nx = dx / R, ny = dy / R;
-  stick.fwd = ny < -0.3; stick.back = ny > 0.45; stick.sl = nx < -0.3; stick.sr = nx > 0.3;
+  // analog: direction of the drag, strength ramps up to full at the ring edge (small dead zone)
+  const m = Math.min(1, Math.max(0, (d - 8) / (R - 8)));
+  stick.x = d > 0 ? dx / d * m : 0; stick.y = d > 0 ? dy / d * m : 0;
 });
 for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) zone.addEventListener(t, (e) => { if (e.pointerId === stickId) resetStick(); });
 const jb = $('tj');
@@ -305,7 +306,9 @@ function pollPad() {
   } else if (pressed('a')) { A.initAudio(); if (!anyAction() && mode === 'play') jumpQueued = true; }
   if (pressed('start')) pause(mode === 'play');
   padPrev = now;
-  return { fwd: now.up, back: now.down, sl: now.left, sr: now.right };
+  const dead = v => (Math.abs(v) < 0.2 ? 0 : v);
+  const hx = dead(ax) + (b(15) ? 1 : 0) - (b(14) ? 1 : 0), hy = dead(ay) + (b(13) ? 1 : 0) - (b(12) ? 1 : 0);
+  return { x: hx, y: hy };
 }
 
 /* ---------- HUD ---------- */
@@ -323,7 +326,7 @@ function updateHud(force) {
   const v = Math.round(Math.hypot(world.p.vx, world.p.vz) * KMH);
   setText('hud-speed', `${v} km/h`);
   const cam = world.ents.find(e => e.k === 'speedcam' && !e.done);
-  $('hud-speed').classList.toggle('over', !!cam && Math.abs(world.p.vx) > cam.lim);
+  $('hud-speed').classList.toggle('over', !!cam && Math.hypot(world.p.vx, world.p.vz) > cam.lim);
 }
 
 /* ---------- orientation hint (only very narrow phones) ---------- */
@@ -338,7 +341,7 @@ addEventListener('resize', checkRotate);
 /* ---------- loop ---------- */
 let last = performance.now(), acc = 0, t = 0;
 function tick(inp) {
-  view.prev = { x: world.p.x, y: world.p.y, z: world.p.z };
+  view.prev = { x: world.p.x, h: world.p.h, z: world.p.z };
   const wasPlay = world.status === 'play';
   step(world, inp, 1, (type, d) => {
     A.sfx(type === 'die' && d?.cause === 'zap' ? 'zap' : type);
@@ -351,12 +354,12 @@ function tick(inp) {
 function frame(now) {
   const dt = Math.min(100, now - last) / 16.667; last = now; t += dt;
   const pad = pollPad();
-  const inp = {
-    fwd: !!(keys.ArrowUp || keys.KeyW || stick.fwd || pad.fwd),
-    back: !!(keys.ArrowDown || keys.KeyS || stick.back || pad.back),
-    sl: !!(keys.ArrowLeft || keys.KeyA || stick.sl || pad.sl),
-    sr: !!(keys.ArrowRight || keys.KeyD || stick.sr || pad.sr)
-  };
+  // free 8-way movement: right = +x, down the screen = +z
+  const kx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
+  const kz = (keys.ArrowDown || keys.KeyS ? 1 : 0) - (keys.ArrowUp || keys.KeyW ? 1 : 0);
+  let mx = kx + stick.x + (pad.x || 0), mz = kz + stick.y + (pad.y || 0);
+  const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
+  const inp = { mx, mz };
   if (mode === 'chapter') { chapterT += dt; if (chapterT > 110) endChapterSplash(); }
   if (mode === 'play' && !frozen) {
     acc += dt; let n = 0;

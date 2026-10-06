@@ -1,59 +1,74 @@
-// Bot inputs that beat each level (see sim.mjs for the command list).
+// Bot routes that beat each level (see sim.mjs for the command list). Coordinates in tile units.
+import { T } from '../src/game/logic.js';
+
 const ent = (k, f = () => true) => w => w.ents.find(e => e.k === k && f(e));
-const lightDone = x => w => ent('light', e => e.x === x)(w).st === 'done';
-const near = (k, f, d) => w => { const e = ent(k, f)(w); return e.on !== false && Math.abs(e.x - w.p.x) < d; };
+const d = (w, e) => Math.hypot(w.p.x - e.x, w.p.z - e.z) / T;
+// some dog / mover / walker is within r tiles of us
+const dogNear = r => w => w.ents.some(e => e.k === 'dog' && e.on && d(w, e) < r);
+// a dog within r tiles that is in front of where we're heading
+const dogAhead = r => w => w.ents.some(e => e.k === 'dog' && e.on && d(w, e) < r && ((e.x - w.p.x) * w.p.vx + (e.z - w.p.z) * w.p.vz) > 0);
+const moverNear = r => w => w.ents.some(e => e.k === 'mover' && e.on && Math.hypot(w.p.x - e.cx, w.p.z - e.cz) / T < r);
+// no car within 2.2 tiles of the crossing point (c, r)
+const clearRoad = (c, r) => w => !w.ents.some(e => e.k === 'mover' && e.on && Math.hypot(e.cx / T - c, e.cz / T - r) < 2.6);
+// a moving mover within r tiles, approaching us
+const moverComing = r => w => w.ents.some(e => e.k === 'mover' && e.on && !e.stopped && Math.hypot(w.p.x - e.cx, w.p.z - e.cz) / T < r && ((w.p.x - e.cx) * e.dx + (w.p.z - e.cz) * e.dz) > 0);
+// no driving mover will reach / still occupy the point (c, r) within the next `f` frames
+const clearFor = (c, r, f = 70) => w => !w.ents.some(e => {
+  if (e.k !== 'mover' || !e.on || e.stopped) return false;
+  const s = ((c * T - e.cx) * e.dx + (r * T - e.cz) * e.dz); // px still to travel to the point (negative = passed)
+  return s > -e.len / 2 - 40 && s - e.len / 2 < e.speed * f;
+});
+const lightDone = w => w.ents.filter(e => e.k === 'light').every(e => e.st === 'idle' || e.st === 'done');
+const lightIs = (i, st) => w => w.ents.filter(e => e.k === 'light')[i].st === st;
 const ground = w => w.p.onGround;
-const walkersGone = w => w.ents.every(e => e.k !== 'walker' || (Math.abs(e.z) > 60 && e.z * e.zs > 0));
-// A dog or wrong-way bike is right in front of us.
-const threat = d => w => w.ents.some(e => ((e.k === 'dog' || e.k === 'onc') && e.on || e.k === 'cart' && e.st >= 1) && e.x - w.p.x > 0 && e.x - w.p.x < d);
-// A ninja bike is right behind us.
-const behind = d => w => w.ents.some(e => e.k === 'onc' && e.on && e.dir > 0 && w.p.x - e.x > 0 && w.p.x - e.x < d);
-// Will a jump now, cruising at v, land inside platform #i (by index among plats)?
-const landsOn = (i, v, T = 41) => w => {
-  const e = w.ents.filter(e => e.k === 'plat')[i];
-  const fx = e.mx ? e.x0 + e.mx * Math.sin((e.t + T) * 2 * Math.PI / e.per + (e.phase ?? 0)) : e.x;
-  const lx = w.p.x + v * 0.9 * T;
-  return lx > fx + 25 && lx < fx + e.w - 25;
-};
 
 export const SOLUTIONS = {
-  1: [['RJ', 525], ['U', ground, 'r'], ['J'], ['RJ', 1160], ['U', ground, 'r'], ['UJ', threat(150), 'r']],
-  2: [['UJ', threat(150), 'r'], ['U', ground, 'r'], ['UJ', threat(150), 'r'], ['U', ground, 'r'], ['RJ', 1600], ['U', ground, 'r'], ['J'],
-      ['U', ground, 'r'], ['RJ', 2150], ['U', ground, 'r'], ['UJ', threat(150), 'r']],
-  3: [['R', 560], ['STOP'], ['UJ', behind(110), 'n'], ['U', ground], ['U', lightDone(800)], ['R', 1300], ['STOP'], ['U', lightDone(1550)],
-      ['RJ', 1930], ['U', ground, 'r'], ['UJ', threat(150), 'r']],
-  4: [['R', 640], ['STOP'], ['U', w => w.ents.every(e => e.k !== 'walker' || (Math.abs(e.z) > 60 && e.z * e.zs > 0))], ['R', 1185], ['STOP'],
-      ['U', w => ent('cart', e => e.x === 1360)(w).st === 2], ['RJ', 1265], ['U', ground, 'r'], ['R', 1705], ['STOP'],
-      ['U', w => ent('fall')(w).st === 2], ['RJ', 1820], ['U', ground, 'r'], ['RJ', 2870]],
-  5: [['UJ', threat(165), 'r'], ['U', ground, 'r'], ['R', 1000], ['STOP'], ['UJ', threat(110), 'n'], ['U', ground], ['R', 1125], ['STOP'],
-      ['U', w => ent('pole')(w).st === 2], ['RJ', 1290], ['U', ground, 'r'], ['UJ', behind(100), 'r'], ['U', ground, 'r'], ['RJ', 2240]],
-  6: [['R', 440], ['STOP'], ['U', lightDone(700)], ['S', 3, 1305], ['RJ', 1385],
-      ['R', 1890], ['UJ', w => { const o = ent('onc')(w); return o.on && o.x - w.p.x < 110; }, 'l'], ['STOP'],
-      ['U', lightDone(2150)], ['RJ', 2235], ['U', ground, 'r'], ['STOP'], ['U', w => ent('pole')(w).st === 2], ['RJ', 2620]],
-  7: [['R', 930], ['STOP'], ['UJ', w => { const b = ent('bus')(w); return b.on && b.x + 270 > w.p.x - 150; }, 'n'],
-      ['U', w => ent('bus')(w).vx === 0], ['R', 2600], ['LANE', -100], ['UJ', threat(165), 'r'], ['U', ground, 'r'], ['R', 2950], ['LANE', 0]],
-  8: [['RJ', 560], ['RJ', 1075], ['U', ground, 'r'], ['J'], ['R', 1480], ['LANE', -75], ['R', 1900], ['LANE', 0], ['U', ground, 'r'], ['S', 2.5, 1985], ['SJ', 2.5, 1986], ['S', 2.6, 2100]],
-  9: [['RJ', 575], ['RJ', 925], ['U', ground, 'r'], ['STOP'], ['U', lightDone(1500)], ['S', 2, 1652], ['STOP'],
-      ['U', w => w.ents.every(e => e.k !== 'pole' || e.st === 2)], ['RJ', 1740], ['U', ground, 'r'], ['RJ', 2030], ['U', ground, 'r'], ['RJ', 2390]],
-  10: [['S', 5, 480], ['SJ', 5, 481], ['SG', 5],
-       ['UJ', landsOn(1, 4.5), 4.5], ['SG', 4.5], ['UJ', landsOn(2, 4.5), 4.5], ['SG', 4.5],
-       ['UJ', landsOn(3, 4.5), 4.5], ['SG', 4.5], ['UJ', landsOn(4, 4.5), 4.5], ['SG', 4.5],
-       ['UJ', landsOn(5, 4.5), 4.5], ['SG', 4.5], ['UJ', landsOn(6, 4.5), 4.5], ['SG', 4.5], ['RJ', 2330],
-       ['UJ', w => { const d = ent('dog')(w); return d.on && d.x - w.p.x < 130; }, 'r']],
-  11: [['S', 4.5, 470], ['SJ', 4.5, 471], ['SG', 4.5], ['SJ', 4.5, 690], ['SG', 4.5], ['SJ', 4.5, 880], ['SG', 4.5],
-       ['SJ', 4.5, 1160], ['SG', 4.5], ['RJ', 1440], ['U', ground, 'r'], ['R', 1910], ['STOP'], ['U', w => ent('walker')(w).z > 60],
-       ['RJ', 2450], ['U', ground, 'r'], ['UJ', behind(100), 'r']],
-  12: [['S', 2, 525], ['STOP'], ['U', w => ent('pole', e => e.x === 800)(w).st === 2], ['RJ', 590],
-       ['U', ground, 'r'], ['R', 1085], ['STOP'], ['U', w => ent('pole', e => e.x === 1250)(w).st === 2], ['RJ', 1190],
-       ['U', ground, 'r'], ['STOP'], ['U', w => ent('fall')(w).st === 2], ['S', 3.2, 1600], ['SJ', 3.2, 1601], ['SG', 3.2],
-       ['S', 2, 1835], ['STOP'], ['U', w => ent('pole', e => e.x === 2100)(w).st === 2], ['RJ', 1920],
-       ['RJ', 2280], ['U', ground, 'r'], ['J']],
-  13: [['RJ', 520], ['S', 4, 850], ['SJ', 4, 851], ['SG', 4], ['SJ', 3.5, 1050], ['SG', 3.5], ['SJ', 3.5, 1240], ['SG', 3.5],
-       ['R', 1565], ['STOP'], ['U', w => ent('fall')(w).st === 2], ['RJ', 1640], ['RJ', 1990], ['RJ', 2230]],
-  14: [['R', 500], ['STOP'], ['U', w => ent('pole')(w).st === 2], ['S', 5, 600], ['SJ', 5, 601], ['SG', 5], ['S', 5, 1040], ['SJ', 5, 1041], ['SG', 5], ['S', 3.5, 1288], ['SJ', 3.5, 1289], ['SG', 3.5], ['RJ', 1455],
-       ['S', 3, 1730], ['UJ', threat(120), 3], ['SG', 3], ['UJ', threat(150), 3], ['SG', 3], ['RJ', 2480], ['RJ', 3060]],
-  15: [['R', 380], ['STOP'], ['UJ', behind(150), 'n'], ['U', ground], ['U', lightDone(650)], ['R', 800], ['STOP'], ['U', walkersGone],
-       ['S', 3, 1385], ['RJ', 1440], ['U', ground, 'r'], ['STOP'], ['U', w => ent('fall')(w).st === 2], ['RJ', 1820],
-       ['U', ground, 'r'], ['S', 2, 2055], ['STOP'], ['U', w => ent('pole')(w).st === 2], ['RJ', 2120],
-       ['U', ground, 'r'], ['S', 2.2, 2605], ['SJ', 2.2, 2606], ['SG', 2.2], ['R', 3070], ['J'], ['U', ground, 'r'], ['RJ', 3395]]
+  2: [['GO', 3, 2], ['GU', 6.5, 2, dogNear(1.2)], ['J'], ['GO', 6.5, 2], ['GO', 6.5, 4], ['GOJ', 9.5, 4, 7.0, 4], ['GO', 9.0, 4],
+      ['GU', 9.0, 5.5, dogNear(1.15)], ['JIF', dogNear(1.15)], ['GU', 9.0, 5.5, w => ground(w) && dogNear(1.15)(w)], ['JIF', dogNear(1.15)],
+      ['GU', 9.0, 5.5, ground], ['GO', 9.0, 5.5], ['GOJ', 12, 5.5, 9.4, 5.5],
+      ['GU', 13.5, 5.2, dogAhead(1.25)], ['JIF', dogAhead(1.25)], ['GO', 13.6, 5], ['GO', 13.6, 2], ['GO', 14.5, 1.5]],
+  3: [['GO', 5.4, 3], ['STOP'], ['UJ', moverNear(1.6)], ['U', ground], ['U', lightDone], ['U', clearRoad(6.5, 3)], ['GO', 8.6, 3],
+      ['GOJ', 12, 3, 9.6, 3], ['GO', 12.5, 3], ['GO', 12.5, 6.5], ['GO', 9.5, 6.5], ['U', w => !ent('finish')(w).moving], ['GO', 8.3, 6.5],
+      ['U', clearRoad(6.5, 6.5)], ['GO', 7, 6.5]],
+  4: [['GO', 4.7, 2], ['U', w => ent('walker')(w).st === 2], ['GO', 7.8, 2], ['U', w => w.ents.filter(e => e.k === 'walker')[1].st === 2],
+      ['GO', 12, 2], ['GO', 12, 6], ['GO', 14.3, 6], ['U', w => !ent('finish')(w).moving], ['GOJ', 7.5, 6, 10.3, 6], ['GO', 4.7, 6],
+      ['U', w => w.ents.filter(e => e.k === 'walker')[2].st === 2], ['GO', 1.6, 6.4]],
+  5: [['GU', 10.9, 2, moverComing(2.3)], ['JIF', moverComing(2.3)], ['GU', 10.9, 2, ground], ['GO', 10.9, 2], ['STOP'],
+      ['U', w => ent('pole')(w).st === 2 || moverComing(2.3)(w)], ['JIF', moverComing(2.3)], ['U', w => ground(w) && ent('pole')(w).st === 2],
+      ['U', ground], ['GOJ', 16, 2, 12, 2],
+      ['GO', 15.3, 2], ['GO', 16.8, 2], ['U', w => w.ents.some(e => e.k === 'mover' && e.behind && e.on && e.cz > w.p.z + 90)], ['GO', 16.8, 6],
+      ['GO', 9.5, 6], ['UJ', moverComing(1.3)], ['U', ground], ['U', w => !moverComing(3)(w)], ['GO', 7.3, 6], ['GOJ', 4.5, 6, 7.1, 6], ['GU', 1.5, 6, w => ground(w) && moverComing(2.3)(w)],
+      ['JIF', moverComing(2.3)], ['GO', 1.5, 6]],
+  6: [['GO', 6.4, 3], ['STOP'], ['U', lightIs(0, 'done')], ['U', clearRoad(8, 3)], ['GO', 9.6, 3], ['GO', 13.2, 3, 0.5], ['GO', 14, 3],
+      ['GOJ', 14, 6.5, 14, 3.6], ['GO', 14, 6.5], ['GO', 9.6, 6.5], ['STOP'], ['U', lightIs(1, 'done')], ['U', clearFor(8, 6.5, 65)],
+      ['GO', 6.5, 6.5], ['GO', 1.6, 6.5]],
+  7: [['GO', 2.6, 1.6], ['STOP'], ['U', w => { const b = ent('mover', e => e.kind === 'bus')(w); return b.on && b.cx / T > 2.6; }], ['UJ', () => true, 2.6, 3.4],
+      ['GU', 2.6, 3.0, w => w.p.onGround], ['U', w => w.p.onGround && w.p.onEnt], ['U', w => ent('mover', e => e.kind === 'bus')(w).stopped], ['GO', 14.6, 3], ['GOJ', 16, 3, 14.7, 3], ['GO', 16, 3], ['GO', 16.4, 3.3], ['UJ', moverComing(1.4)], ['U', ground],
+      ['GO', 15.5, 3.5], ['GO', 15.5, 5.5], ['GO', 16.5, 5.5]],
+  8: [['GO', 3, 2], ['GOJ', 8, 2, 3.9, 2], ['GO', 8, 2], ['GOJ', 11.5, 2, 7.9, 2], ['GO', 11.5, 2], ['U', w => ent('mover')(w).stopped], ['GO', 12, 2.75], ['GO', 15, 2.75], ['GO', 15, 4.5],
+      ['GO', 13.8, 4.5], ['GOJ', 9.5, 4.5, 13.4, 4.5], ['GO', 10.5, 4.5], ['GOJ', 4, 4.5, 9.85, 4.5], ['GU', 6, 4.5, ground], ['GO', 6, 4.5], ['U', w => w.ents.filter(e => e.k === 'mover')[1].stopped], ['GO', 4.3, 5.75],
+      ['GO', 1.6, 5.75]],
+  9: [['GO', 3.5, 1.4], ['GO', 7, 1.4], ['GO', 7, 2.4], ['STOP'], ['GOJ', 7, 4.5, 7, 2.45], ['GU', 7, 4.5, ground], ['GO', 7, 4], ['GO', 8.7, 4],
+      ['STOP'], ['U', w => w.ents.filter(e => e.k === 'pole')[0].st === 2], ['GO', 7, 5.5], ['STOP'], ['U', w => w.ents.filter(e => e.k === 'pole')[1].st === 2],
+      ['GOJ', 3.6, 5.5, 5.4, 5.5], ['GU', 3.6, 5.5, ground], ['GO', 3.6, 5.5], ['STOP'], ['GOJ', 1.5, 5.5, 3.45, 5.5], ['GU', 1.5, 5.5, ground], ['GO', 1.5, 5.5]],
+  10: [['GO', 2.55, 1.9], ['HOP', 0], ['AIR'], ['HOP', 1], ['AIR'], ['HOP', 2], ['AIR'], ['HOP', 3], ['AIR'], ['HOP', 4], ['AIR'],
+       ['HOP', 5], ['AIR'], ['HOPXY', 15.5, 1.9], ['AIR'], ['GO', 15.5, 2.5]],
+  11: [['GO', 2.2, 2.5], ['GOJ', 5.5, 2.5, 2.25, 2.5], ['GU', 4.4, 2.5, ground], ['GO', 4.3, 2.5], ['GOJ', 7.5, 2.5, 4.35, 2.5], ['GU', 7.5, 2.5, ground],
+       ['GO', 7.4, 2.5], ['GOJ', 10.5, 2.5, 7.45, 2.5], ['GU', 10.5, 2.5, ground], ['GO', 10.5, 1.6], ['GO', 12.2, 1.6],
+       ['U', w => ent('walker')(w).st === 2 || ent('walker')(w).z > 3.2 * T], ['U', w => !moverComing(3)(w)], ['GO', 15.3, 1.6], ['GO', 15.5, 3.8], ['U', w => ent('finish')(w).ran && !ent('finish')(w).moving], ['GO', 16.5, 1.6]],
+  12: [['GO', 2, 2.5], ['GO', 4.3, 2.5], ['STOP'], ['U', w => w.ents.filter(e => e.k === 'pole')[0].st === 2], ['GOJ', 7, 2.5, 4.85, 2.5], ['GU', 7, 2.5, ground],
+       ['GO', 9, 2.5], ['STOP'], ['U', w => w.ents.filter(e => e.k === 'pole')[3].st === 2], ['GO', 9.3, 2.2], ['GOJ', 12, 2.2, 9.6, 2.2], ['GU', 12, 2.2, ground],
+       ['GU', 13.5, 2.2, dogAhead(1.25)], ['JIF', dogAhead(1.25)], ['GU', 13.5, 2.2, ground], ['GO', 13.5, 2.3], ['GO', 13.5, 2.9], ['STOP'],
+       ['U', w => w.ents.filter(e => e.k === 'pole')[4].st === 2], ['GOJ', 13.5, 5.5, 13.5, 3.7], ['GU', 13.5, 5.5, ground], ['GO', 13.5, 5.5]],
+  13: [['GO', 3.4, 4], ['HOP', 0], ['AIR'], ['HOP', 1], ['AIR'], ['HOP', 2], ['AIR'], ['HOP', 3], ['AIR'], ['HOPXY', 11.6, 4], ['AIR'],
+       ['GO', 11.6, 4], ['GOJ', 13.5, 4, 11.65, 4], ['GU', 13.5, 4, ground], ['GO', 13.5, 3.6], ['U', w => !ent('finish')(w).moving], ['GO', 13.5, 1.6]],
+  14: [['GO', 14, 1.5], ['GO', 11.2, 1.6], ['STOP'], ['U', w => ent('pole')(w).st === 2], ['GOJ', 6, 1.6, 10.6, 1.6], ['GU', 6, 1.6, ground], ['GO', 2, 1.8],
+       ['GO', 2, 3.0], ['GOJ', 2, 5.5, 2, 3.25], ['GU', 2, 5.5, ground], ['GO', 2, 6.5],
+       ['GO', 4.5, 6.5], ['UJ', moverComing(1.5)], ['U', ground], ['U', w => !ent('finish')(w).moving],
+       ['GU', 10.5, 5.5, dogAhead(1.25)], ['JIF', dogAhead(1.25)], ['GU', 10.5, 5.5, ground], ['GO', 10.5, 5.5]],
+  15: [['GO', 3, 1.8], ['GO', 5, 2.4], ['STOP'], ['UJ', moverComing(1.5)], ['U', ground], ['U', lightDone], ['GO', 5, 3.5],
+       ['U', w => ent('walker')(w).st === 2], ['GO', 5, 5.5], ['GO', 8.4, 5.5], ['GO', 11.15, 5.5, 0.45], ['U', clearFor(13, 5, 75)],
+       ['GO', 14.5, 5.3], ['GO', 15.7, 5.3], ['U', w => !ent('finish')(w).moving], ['GO', 14.6, 4.5], ['U', clearFor(13, 3.5, 70)], ['GO', 12.5, 3.5],
+       ['GO', 12.5, 2], ['GO', 18.5, 1.5]],
+  1: [['GO', 3.5, 2], ['GOJ', 7.2, 2, 4.3, 2], ['GOJ', 11.5, 2, 7.4, 2], ['GO', 11.5, 2], ['GO', 11.6, 5], ['GU', 1.5, 5, dogNear(1.1)], ['J'], ['GO', 1.5, 5]]
 };

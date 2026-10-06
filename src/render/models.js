@@ -318,7 +318,7 @@ export function makePlank(w = 120, kind = 'board', d = 110) {
   if (kind === 'scaffold') {
     g.add(part(box(w, 12, d), '#c9a46a', { pos: [w / 2, -6, 0] }));
     g.add(part(box(w, 4, d + 2), '#f4d35e', { pos: [w / 2, -12, 0], outline: false }));
-    for (const x of [8, w - 8]) for (const z of [-d / 2 + 6, d / 2 - 6]) g.add(part(cyl(1.5, 1.5, 600, 6), '#666', { pos: [x, 300, z], outline: false }));
+    for (const x of [8, w - 8]) for (const z of [-d / 2 + 6, d / 2 - 6]) g.add(part(cyl(2, 2, 260, 6), '#666', { pos: [x, -130, z], outline: false }));
   } else g.add(part(box(w, 14, d), '#a07a4a', { pos: [w / 2, -7, 0] }));
   return g;
 }

@@ -1,16 +1,15 @@
-// Renderer: owns the three.js scene, the chase camera, player model, particles and the 2D overlay
-// (speech bubbles, "behind you" warnings). Reads logic state, never mutates it.
+// Renderer: owns the three.js scene, the fixed high 3/4 camera (Trees-Hate-You style), player model,
+// particles and the 2D overlay (speech bubbles, off-screen traffic warnings). Reads logic state, never mutates it.
 import * as THREE from 'three';
-import { G } from '../game/logic.js';
+import { T, tileAt } from '../game/logic.js';
 import { settings, disposeTree, fontPx } from './toon.js';
 import { makeRider } from './models.js';
 import { buildWorld, THEMES } from './world.js';
 import { makeEntityView } from './entities.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-const Y = y => G - y;
-// Chase camera: behind and above the rider, looking down the street (Trees-Hate-You style 3/4 view).
-const CAM_BACK = 370, CAM_UP = 370, LOOK_AHEAD = 270;
+// Camera sits high above and in front (toward +z) of the player, looking down at ~58 degrees.
+const CAM_UP = 700, CAM_BACK = 440;
 
 export class View {
   constructor(canvas, overlay) {
@@ -27,17 +26,17 @@ export class View {
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environmentIntensity = 0.45;
     pmrem.dispose();
-    this.camera = new THREE.PerspectiveCamera(50, 16 / 9, 10, 9000);
+    this.camera = new THREE.PerspectiveCamera(40, 16 / 9, 10, 6000);
     this.hemi = new THREE.HemisphereLight('#fff', '#666', 1.2);
     this.sun = new THREE.DirectionalLight('#fff', 2.5);
     this.sun.shadow.mapSize.set(2048, 2048);
     Object.assign(this.sun.shadow.camera, { left: -900, right: 900, top: 900, bottom: -900, near: 10, far: 3000 });
     this.sun.shadow.bias = -0.0015; this.sun.shadow.normalBias = 1.5;
     this.scene.add(this.hemi, this.sun, this.sun.target);
-    this.fog = new THREE.Fog('#fff', 1400, 4200); this.scene.fog = this.fog;
+    this.fog = new THREE.Fog('#fff', 1600, 4200); this.scene.fog = this.fog;
     this.dyn = new THREE.Group(); this.scene.add(this.dyn);
     this.cam = new THREE.Vector3(); this.look = new THREE.Vector3();
-    this.shake = 0; this.flash = 0; this.heading = 0;
+    this.shake = 0; this.flash = 0; this.heading = 0; this.bank = 0;
     this.world = null; this.worldKey = null; this.views = [];
     this.particles = new Particles(this.scene);
     this.quality = 'high';
@@ -63,9 +62,9 @@ export class View {
     this.overlay.width = Math.round(w * dpr); this.overlay.height = Math.round(h * dpr);
     this.dpr = dpr; this.W = w; this.H = h;
     this.camera.aspect = w / h;
-    // narrow (portrait) screens: pull back and widen so the whole street stays in view
-    this.zoom = Math.min(1.7, Math.max(1, 1.35 / this.camera.aspect));
-    this.camera.fov = this.camera.aspect < 1 ? 64 : 52;
+    // narrow (portrait) screens: pull back so a useful chunk of the block stays in view
+    this.zoom = Math.min(1.8, Math.max(1, 1.45 / this.camera.aspect));
+    this.camera.fov = 40;
     this.camera.updateProjectionMatrix();
   }
 
@@ -74,14 +73,14 @@ export class View {
     const key = world.def.id + ':' + theme + ':' + this.quality;
     if (key !== this.worldKey) {
       if (this.world) { this.scene.remove(this.world.root); this.world.dispose(); }
-      this.world = buildWorld(world.def, world.ents, theme);
+      this.world = buildWorld(world.def, world.ents, theme, world.map);
       this.scene.add(this.world.root);
       this.worldKey = key;
       const th = THEMES[theme];
       this.th = th;
       this.scene.background = this.world.sky;
       this.fog.color.set(th.fog);
-      this.fog.near = th.rain ? 900 : 1400; this.fog.far = th.rain ? 3000 : 4200;
+      this.fog.near = th.rain ? 1200 : 1600; this.fog.far = th.rain ? 3200 : 4200;
       this.hemi.color.set(th.hemi[0]); this.hemi.groundColor.set(th.hemi[1]); this.hemi.intensity = th.hi;
       this.sun.color.set(th.light); this.sun.intensity = th.li;
     }
@@ -92,27 +91,28 @@ export class View {
     for (const v of this.views) { this.dyn.remove(v.obj); disposeTree(v.obj); }
     this.views = [];
     if (this.player) { this.dyn.remove(this.player.root, this.player.blob); disposeTree(this.player.root); disposeTree(this.player.blob); }
-    const ctx = { th: this.th, touch: this.touch };
+    this.map = world.map;
+    const ctx = { th: this.th, touch: this.touch, map: world.map };
     for (const e of world.ents) {
       const v = makeEntityView(e, ctx);
       if (v) {
         this.views.push(v); if (v.obj) this.dyn.add(v.obj);
         if (this.attractMode && e.k === 'txt') v.obj.visible = false;
-        if (v.overhead) v.fade = { a: 1, mats: fadeable(v.overhead) };
       }
     }
     const r = makeRider({ body: '#e63946', helmet: '#ffd23f', jacket: '#4d7cfe', pants: '#2b2d42', mask: true });
     const root = new THREE.Group(), tumble = new THREE.Group();
     tumble.add(r.g); root.add(tumble);
     // blob shadow, used when real shadows are off
-    const blob = new THREE.Mesh(new THREE.CircleGeometry(30, 20), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.3, depthWrite: false }));
+    const blob = new THREE.Mesh(new THREE.CircleGeometry(26, 20), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.3, depthWrite: false }));
     blob.rotation.x = -Math.PI / 2; blob.material.userData.own = true; blob.visible = false;
     this.player = { r, root, tumble, blob };
     this.dyn.add(root, blob);
     this.particles.clear();
-    this.prev = { x: world.p.x, y: world.p.y, z: world.p.z };
-    this.heading = 0;
-    this.placeTarget(world.p.x, G - world.p.y, world.p.z, true);
+    const p = world.p;
+    this.prev = { x: p.x, h: p.h, z: p.z };
+    this.heading = p.heading; this.bank = 0;
+    this.placeTarget(p.x, p.h, p.z, true);
     this.shake = 0; this.flash = 0;
   }
 
@@ -120,101 +120,108 @@ export class View {
   event(type, d, w) {
     const P = this.particles, p = w.p;
     switch (type) {
-      case 'crack': this.shake = 7; for (let i = 0; i < 16; i++) P.burst(d.x + Math.random() * d.w, 0, (d.z ?? 0) + (Math.random() - 0.5) * 200, 1, '#6b6a75', 4, 7); break;
-      case 'thud': this.shake = d.big ? 12 : 8; for (let i = 0; i < 10; i++) P.burst(d.x + (Math.random() - 0.5) * 60, 4, (d.z ?? 0) + (Math.random() - 0.5) * 160, 1, '#b9a68a', 4, 7); break;
+      case 'crack': this.shake = 7; for (let i = 0; i < 16; i++) P.burst(d.x + (Math.random() - 0.5) * d.w, 0, d.z + (Math.random() - 0.5) * 60, 1, '#6b6a75', 4, 7); break;
+      case 'thud': this.shake = d?.big ? 12 : 8; if (d) for (let i = 0; i < 10; i++) P.burst(d.x + (Math.random() - 0.5) * 60, 4, d.z + (Math.random() - 0.5) * 60, 1, '#b9a68a', 4, 7); break;
       case 'geyser': this.shake = 8; break;
-      case 'die': this.shake = 16; P.burst(p.x, Y(p.y) + 30, p.z, 26, '#ffd23f', 7, 6); if (d.cause === 'zap') P.burst(p.x, Y(p.y) + 30, p.z, 20, '#bfe6ff', 9, 4); break;
-      case 'win': for (let i = 0; i < 40; i++) P.burst(p.x, Y(p.y) + 60, p.z, 1, ['#ffd23f', '#e63946', '#4d7cfe', '#34c759'][i % 4], 8, 6); break;
-      case 'land': P.burst(p.x, Y(p.y), p.z, Math.min(10, d.air / 4), '#b9a68a', 2.5, 5, 0.15); break;
-      case 'jump': P.burst(p.x - 20, Y(p.y), p.z, 4, '#cfc5b5', 1.5, 4, 0.1); break;
+      case 'die': this.shake = 16; P.burst(p.x, p.h + 30, p.z, 26, '#ffd23f', 7, 6); if (d.cause === 'zap') P.burst(p.x, p.h + 30, p.z, 20, '#bfe6ff', 9, 4); break;
+      case 'win': for (let i = 0; i < 40; i++) P.burst(p.x, p.h + 60, p.z, 1, ['#ffd23f', '#e63946', '#4d7cfe', '#34c759'][i % 4], 8, 6); break;
+      case 'land': P.burst(p.x, p.h, p.z, Math.min(10, d.air / 4), '#b9a68a', 2.5, 5, 0.15); break;
+      case 'jump': P.burst(p.x, p.h, p.z, 4, '#cfc5b5', 1.5, 4, 0.1); break;
       case 'flash': this.flash = 1; break;
-      case 'scatter': for (let i = 0; i < 12; i++) P.burst(d.x, 10, (Math.random() - 0.5) * 200, 1, '#dfe3e8', 5, 3); break;
-      case 'honk': if (d?.behind) this.behindT = 90; break;
+      case 'scatter': for (let i = 0; i < 12; i++) P.burst(d.x + (Math.random() - 0.5) * 60, 10, d.z + (Math.random() - 0.5) * 60, 1, '#dfe3e8', 5, 3); break;
     }
   }
 
   /* ---------- per frame ---------- */
   frame(w, alpha, dt, t, inp) {
-    const p = w.p;
-    const px = this.prev.x + (p.x - this.prev.x) * alpha, py = this.prev.y + (p.y - this.prev.y) * alpha, pz = this.prev.z + (p.z - this.prev.z) * alpha;
+    const p = w.p, pr = this.prev;
+    const px = pr.x + (p.x - pr.x) * alpha, ph = pr.h + (p.h - pr.h) * alpha, pz = pr.z + (p.z - pr.z) * alpha;
     const pl = this.player;
-    pl.root.position.set(px, Y(py), pz);
-    // smooth heading toward the logic heading
+    pl.root.position.set(px, ph, pz);
+    // smooth heading toward the logic heading, and bank into the turn
     let dh = p.heading - this.heading; dh = Math.atan2(Math.sin(dh), Math.cos(dh));
-    this.heading += dh * Math.min(1, 0.25 * (dt || 0));
+    const k = Math.min(1, 0.25 * (dt || 0));
+    this.heading += dh * k;
+    this.bank += (Math.max(-0.4, Math.min(0.4, dh * 1.2)) - this.bank) * k;
     pl.root.rotation.y = this.heading;
     pl.r.spin(p.wheel);
-    pl.r.lean(w.status === 'play' ? (inp.fwd ? 0.12 : inp.back ? -0.12 : 0) : 0);
-    const overHole = py > G + 1 || w.ents.some(e => e.k === 'hole' && e.open && px > e.x + 6 && px < e.x + e.w - 6 && pz > e.z + 6 && pz < e.z + e.d - 6);
+    const moving = Math.hypot(p.vx, p.vz) > 0.5;
+    pl.r.lean(w.status === 'play' && moving ? 0.1 : 0);
+    const ground = tileAt(w.map, px, pz);
+    const overHole = ph < -2 || ground === ' ' || w.ents.some(e => e.k === 'hole' && e.open && px > e.x + 6 && px < e.x + e.w - 6 && pz > e.z + 6 && pz < e.z + e.d - 6);
     pl.blob.visible = !settings.shadows && !overHole && w.status !== 'dead';
-    if (pl.blob.visible) { const gy = p.onPlat ? Y(py) : 0, h = Math.max(0, Y(py) - gy); pl.blob.position.set(px, gy + 0.8, pz); pl.blob.scale.setScalar(Math.max(0.4, 1 - h / 250)); }
+    if (pl.blob.visible) { const gy = p.onPlat ? ph : 0, hh = Math.max(0, ph - gy); pl.blob.position.set(px, gy + 0.8, pz); pl.blob.scale.setScalar(Math.max(0.4, 1 - hh / 250)); }
     if (w.status === 'dead') { pl.tumble.position.y = 30; pl.r.g.position.y = -30; pl.tumble.rotation.z = -p.spin; pl.tumble.rotation.x = 0; }
     else {
       pl.tumble.position.y = 0; pl.r.g.position.y = 0;
-      pl.tumble.rotation.z = p.onGround ? 0 : -Math.max(-0.3, Math.min(0.25, p.vy * 0.022));
-      pl.tumble.rotation.x = Math.max(-0.35, Math.min(0.35, p.vz * 0.06)); // bank into turns
+      pl.tumble.rotation.z = p.onGround ? 0 : Math.max(-0.3, Math.min(0.3, p.vh * 0.025));
+      pl.tumble.rotation.x = -this.bank;
     }
     // ambient particles
+    const back = [px - Math.cos(this.heading) * 34, pz + Math.sin(this.heading) * 34];
     if (w.status === 'play') {
-      if (inp.fwd && p.onGround && Math.random() < 0.3) this.particles.burst(px - 40, Y(py) + 30, pz, 1, '#d8d4cc', 0.8, 6, -0.02, 30);
-      if (p.water && Math.random() < 0.5) this.particles.burst(px - 20, 30, pz, 1, '#bfe6ff', 2.5, 4, 0.3);
+      if (moving && p.onGround && Math.random() < 0.3) this.particles.burst(back[0], ph + 26, back[1], 1, '#d8d4cc', 0.8, 6, -0.02, 30);
+      if (p.water && Math.random() < 0.5) this.particles.burst(back[0], 8, back[1], 1, '#bfe6ff', 2.5, 4, 0.3);
     }
-    if (w.status === 'dead' && w.cause === 'zap' && Math.random() < 0.5) this.particles.burst(px, Y(py) + 30, pz, 1, '#ffe14d', 4, 4, 0.1);
+    if (w.status === 'dead' && w.cause === 'zap' && Math.random() < 0.5) this.particles.burst(px, ph + 30, pz, 1, '#ffe14d', 4, 4, 0.1);
     // entities
     for (const v of this.views) {
       v.update?.(v.e, w, t, dt);
-      if (v.billboard) { v.obj.quaternion.copy(this.camera.quaternion); v.obj.visible = v.e.x > px - 60; }
-      if (v.fade) {
-        // overhead structures (balconies, arches, gate frames) go see-through while they are between camera and rider
-        const between = v.e.x > this.camera.position.x - 80 && v.e.x < px + 240;
-        const a = v.fade.a += ((between ? 0.18 : 1) - v.fade.a) * Math.min(1, 0.15 * (dt || 1));
-        for (const m of v.fade.mats) { m.opacity = a; m.transparent = a < 0.99; m.depthWrite = a > 0.6; }
-      }
+      if (v.billboard) v.obj.quaternion.copy(this.camera.quaternion);
       if (v.sparks && v.e.st === 1 && v.e.wob <= 0 && Math.random() < 0.5) {
-        const e = v.e, k = 0.8;
-        this.particles.burst(e.x + e.dx * Math.sin(e.a) * e.len * k, Math.cos(e.a) * e.len * k, e.zb + e.dz * Math.sin(e.a) * e.len * k, 1, '#ffe14d', 3, 4, 0.2);
+        const e = v.e, q = Math.sin(e.a) * e.len * 0.8;
+        this.particles.burst(e.x + e.dx * q, Math.cos(e.a) * e.len * 0.8, e.z + e.dz * q, 1, '#ffe14d', 3, 4, 0.2);
       }
-      const sp = v.spray?.(v.e);
-      if (sp && w.ents.some(f => f.k === 'flood' && sp[0] > f.x0 && sp[0] < f.x1) && Math.random() < 0.6) this.particles.burst(sp[0], 20, sp[1], 1, '#bfe6ff', 4, 5, 0.35);
+      const e = v.e;
+      if (v.mover && e.on && !e.stopped && Math.random() < 0.6) {
+        if (tileAt(w.map, e.cx, e.cz) === '~') this.particles.burst(e.cx, 10, e.cz, 1, '#bfe6ff', 4, 5, 0.35);
+        else if (Math.random() < 0.3) this.particles.burst(e.cx - e.dx * e.len / 2, 14, e.cz - e.dz * e.len / 2, 1, '#9a9a9a', 0.8, 7, -0.03, 30);
+      }
     }
     this.particles.update(dt);
-    if (w.status !== 'dead') this.placeTarget(px, Y(py), pz, false, dt);
+    if (w.status !== 'dead') this.placeTarget(px, ph, pz, false, dt);
     this.shake *= Math.pow(0.86, dt);
     this.flash = Math.max(0, this.flash - 0.04 * dt);
-    if (this.behindT > 0) this.behindT -= dt;
     this.place(t);
     this.renderer.render(this.scene, this.camera);
     this.drawOverlay(w, t);
   }
 
-  placeTarget(px, wy, pz, snap, dt = 1) {
-    const k = this.zoom || 1;
-    const lx = px + LOOK_AHEAD, ly = Math.max(0, wy - 20) * 0.6, lz = pz * 0.55;
-    const cx = px - CAM_BACK * k, cy = CAM_UP * k + Math.max(0, wy - 60) * 0.5, cz = pz * 0.7;
+  // Follow the player, but keep the view inside the map so small levels sit still like a diorama.
+  placeTarget(px, ph, pz, snap, dt = 1) {
+    const m = this.map, W = m.W * T, H = m.H * T;
+    const z = this.zoom || 1, dist = Math.hypot(CAM_UP, CAM_BACK) * z;
+    const halfW = dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.camera.aspect * 0.92;
+    const halfD = dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 1.1;
+    const fit = (v, size, half) => (size <= half * 2 ? size / 2 : Math.max(half - T * 0.6, Math.min(size - half + T * 0.6, v)));
+    const lx = fit(px, W, halfW), lz = fit(pz, H, halfD) + 10, ly = Math.max(0, ph) * 0.3;
+    const cx = lx, cy = CAM_UP * z + ly, cz = lz + CAM_BACK * z;
     if (snap) { this.look.set(lx, ly, lz); this.cam.set(cx, cy, cz); return; }
-    const a = Math.min(1, 0.12 * dt), b = Math.min(1, 0.08 * dt);
-    this.look.x += (lx - this.look.x) * a; this.look.y += (ly - this.look.y) * b; this.look.z += (lz - this.look.z) * b;
-    this.cam.x += (cx - this.cam.x) * a; this.cam.y += (cy - this.cam.y) * b; this.cam.z += (cz - this.cam.z) * b;
+    const a = Math.min(1, 0.09 * dt);
+    this.look.x += (lx - this.look.x) * a; this.look.y += (ly - this.look.y) * a; this.look.z += (lz - this.look.z) * a;
+    this.cam.x += (cx - this.cam.x) * a; this.cam.y += (cy - this.cam.y) * a; this.cam.z += (cz - this.cam.z) * a;
   }
 
   place(t) {
     const s = this.shake, cam = this.camera;
     cam.position.set(this.cam.x + (Math.random() - 0.5) * s, this.cam.y + (Math.random() - 0.5) * s, this.cam.z + (Math.random() - 0.5) * s);
     cam.lookAt(this.look);
-    this.sun.position.set(this.look.x - 300, 1000, this.look.z + 500);
-    this.sun.target.position.set(this.look.x + 150, 0, this.look.z);
-    this.world?.update(t, cam);
+    this.sun.position.set(this.look.x - 400, 1100, this.look.z + 300);
+    this.sun.target.position.set(this.look.x, 0, this.look.z - 100);
+    this.world?.update(t, cam, this.look);
   }
 
-  // Title screen: slow cruise down the street.
+  // Title screen: the camera drifts slowly over level 1 while the rider idles at the start.
   attract(w, t, dt) {
-    const x = 300 + ((t * 1.2) % Math.max(600, w.len - 400));
-    this.placeTarget(x, 0, Math.sin(t * 0.01) * 40, true);
+    const m = w.map, W = m.W * T;
+    const x = W / 2 + Math.sin(t * 0.004) * W * 0.3;
+    this.placeTarget(x, 0, m.H * T / 2, true);
     for (const v of this.views) { v.update?.(v.e, w, t, dt); if (v.billboard) v.obj.quaternion.copy(this.camera.quaternion); }
-    this.player.root.position.set(x, 0, Math.sin(t * 0.01) * 40);
-    this.player.root.rotation.y = -Math.cos(t * 0.01) * 0.15;
-    this.player.r.spin(t * 0.4);
-    this.player.blob.visible = false;
+    const pl = this.player;
+    pl.root.position.set(w.p.x + 40 + Math.sin(t * 0.03) * 30, 0, w.p.z);
+    pl.root.rotation.y = Math.cos(t * 0.03) > 0 ? 0 : Math.PI;
+    pl.r.spin(t * 0.4);
+    pl.blob.visible = false;
     this.particles.update(dt);
     this.place(t);
     this.renderer.render(this.scene, this.camera);
@@ -232,33 +239,29 @@ export class View {
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.clearRect(0, 0, this.W, this.H);
     if (this.flash > 0) { c.fillStyle = `rgba(255,255,255,${this.flash})`; c.fillRect(0, 0, this.W, this.H); }
-    let behind = this.behindT > 0;
     for (const v of this.views) {
       const b = v.bubble?.(v.e, w, t);
       if (b) {
         const [sx, sy, sz] = this.toScreen(b.x, b.y, b.z ?? 0);
         if (sz < 1 && sx > -100 && sx < this.W + 100) b.plain ? outlined(c, b.s, sx, sy, b.size * s) : bubble(c, b.s, sx, sy, b.size * s);
       }
-      const bx = v.behind?.(v.e);
-      if (bx != null && bx < w.p.x - 30 && bx > w.p.x - 900) behind = true;
-    }
-    if (behind && (t | 0) % 20 < 13) {
-      outlined(c, '▼ BÍÍÍP! PHÍA SAU! ▼', this.W / 2, this.H - 150 * s, 30 * s, '#ff5a5a');
+      // traffic coming from off screen: warn at the screen edge where it will appear
+      const e = v.e;
+      if (v.mover && e.on && !e.stopped && w.status === 'play') {
+        const [sx, sy, sz] = this.toScreen(e.cx, 30, e.cz), m = 40 * s;
+        if (sz < 1 && (sx < 0 || sx > this.W || sy < 0 || sy > this.H) && Math.hypot(e.cx - w.p.x, e.cz - w.p.z) < 1500 && (t | 0) % 16 < 11) {
+          const ex = Math.max(m * 1.6, Math.min(this.W - m * 1.6, sx)), ey = Math.max(m * 1.6, Math.min(this.H - m * 1.6, sy));
+          const ang = Math.atan2(sy - ey, sx - ex);
+          c.save(); c.translate(ex + Math.cos(ang) * m * 0.9, ey + Math.sin(ang) * m * 0.9); c.rotate(ang);
+          c.beginPath(); c.moveTo(14 * s, 0); c.lineTo(-8 * s, -11 * s); c.lineTo(-8 * s, 11 * s); c.closePath();
+          c.fillStyle = '#ff5a5a'; c.strokeStyle = '#2a1f1a'; c.lineWidth = 3; c.fill(); c.stroke(); c.restore();
+          outlined(c, 'BÍÍP!', ex - Math.cos(ang) * m * 0.3, ey - Math.sin(ang) * m * 0.3, 20 * s, '#ff5a5a');
+        }
+      }
     }
   }
 
   uiScale() { return Math.max(0.7, Math.min(1.5, Math.min(this.H, this.W) / 600)); }
-}
-
-// Give a subtree its own transparent-capable materials; returns them for fading.
-function fadeable(objs) {
-  const mats = [];
-  for (const o of objs) o.traverse((m) => {
-    if (!m.isMesh) return;
-    const conv = mat => { const c = mat.clone(); c.userData.own = true; mats.push(c); return c; };
-    m.material = Array.isArray(m.material) ? m.material.map(conv) : conv(m.material);
-  });
-  return mats;
 }
 
 /* ---------- drawing helpers for the overlay ---------- */

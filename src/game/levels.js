@@ -1,29 +1,35 @@
-// Level data. Every level is short (Trees-Hate-You style): a handful of trolls, learn by dying.
-// Coordinates are in logic pixels (see logic.js). G is the road surface.
-import { G } from './logic.js';
+// Level data, Trees-Hate-You style: each level is a small Saigon block you roam freely.
+// Map legend: '#' house  'T' tree  'K' kiosk/wall  '=' road  '.' pavement  ',' grass
+//             '~' flood water  ' ' canal / pit  'S' start  'F' finish
+// Entities use tile coordinates (column, row); helpers convert them to world px.
+import { T } from './logic.js';
 
-const txt = (x, h, s, o = {}) => ({ k: 'txt', x, y: G - h, s, size: o.size ?? 22, color: o.color ?? '#fff' });
-const hole = (x, w, o = {}) => ({ k: 'hole', x, w, ...o, hidden: !!o.hidden, sign: !!o.sign, puddle: !!o.puddle });
-const light = (x, o = {}) => ({ k: 'light', x, fickle: !!o.fickle, trig: o.trig });
-const pole = (x, side, trig, o = {}) => ({ k: 'pole', x, side, trig, ...o });
-const tree = (x, side, trig, o = {}) => ({ k: 'pole', kind: 'tree', x, side, trig, len: 220, acc: 0.0035, wob: 16, ...o });
-const manhole = (x, z = 0) => ({ k: 'manhole', x, z });
-const dog = (trig, x, o = {}) => ({ k: 'dog', trig, x, ...o });
-const onc = (trig, o = {}) => ({ k: 'onc', trig, ...o });
-const bus = (trig, stopX) => ({ k: 'bus', trig, stopX });
-const flood = (x0, x1) => ({ k: 'flood', x0, x1 });
-const gate = (x, trig) => ({ k: 'gate', x, trig });
-const finish = (x, label, o = {}) => ({ k: 'finish', x, label, ...o });
-const sign = (x, label, o = {}) => ({ k: 'sign', x, label, ...o });
-const car = (x, o = {}) => ({ k: 'car', x, ...o });
-const fall = (x, trig, kind = 'ac', o = {}) => ({ k: 'fall', x, trig, kind, ...(kind === 'pot' ? { w: 46, h: 46 } : kind === 'beam' ? { w: 130, h: 24 } : {}), ...o });
-const walker = (x, trig, o = {}) => ({ k: 'walker', x, trig, ...o });
-const cart = (x, trig, o = {}) => ({ k: 'cart', x, trig, ...o });
-const nails = (x, w, o = {}) => ({ k: 'nails', x, w, ...o, hidden: !!o.hidden });
-const banner = (x, o = {}) => ({ k: 'banner', x, ...o });
-const speedcam = (x, o = {}) => ({ k: 'speedcam', x, ...o });
-const plat = (x, h, w, o = {}) => ({ k: 'plat', x, y: G - h, w, ...o });
-const block = (x, w, h, o = {}) => ({ k: 'block', x, w, h, ...o, kind: o.kind ?? 'barrier' });
+const P = c => c * T + T / 2;   // centre of a tile
+const E = c => c * T;           // edge of a tile
+const trig = (o) => (o.at ? { tx: P(o.at[0]), tz: P(o.at[1]) } : {});
+const opts = (o) => { const { at, ...rest } = o; return { ...rest, ...trig(o) }; };
+
+const txt = (c, r, s, o = {}) => ({ k: 'txt', x: P(c), z: P(r), h: o.h ?? 110, s, size: o.size ?? 20, color: o.color ?? '#fff' });
+const hole = (c, r, cw = 1, rh = 1, o = {}) => ({ k: 'hole', x: E(c), z: E(r), w: cw * T, d: rh * T, tr: 70, ...opts(o) });
+const dog = (c, r, o = {}) => ({ k: 'dog', x: P(c), z: P(r), ...opts(o) });
+// dir: 'R' 'L' 'U' 'D' (screen directions)
+const DIRS = { R: [1, 0], L: [-1, 0], D: [0, 1], U: [0, -1] };
+const mover = (kind, c, r, dir, o = {}) => ({ k: 'mover', kind, x: o.px ?? P(c), z: o.pz ?? P(r), dx: DIRS[dir][0], dz: DIRS[dir][1], ...opts(o) });
+const pole = (c, r, ang, o = {}) => ({ k: 'pole', x: P(c), z: P(r), ang, ...opts(o) });
+const tree = (c, r, ang, o = {}) => ({ k: 'pole', kind: 'tree', x: P(c), z: P(r), ang, len: 200, acc: 0.0035, wob: 16, ...opts(o) });
+const fall = (c, r, kind = 'ac', o = {}) => ({ k: 'fall', x: P(c), z: P(r), kind, ...opts(o) });
+const manhole = (c, r) => ({ k: 'manhole', x: P(c), z: P(r) });
+const nails = (c, r, cw = 1, rh = 1, o = {}) => ({ k: 'nails', x: E(c), z: E(r), w: cw * T, d: rh * T, tr: 90, ...opts(o) });
+const light = (c, r, cw, rh, o = {}) => ({ k: 'light', x: E(c), z: E(r), w: cw * T, d: rh * T, ...opts(o) });
+const speedcam = (c, r, cw, rh, o = {}) => ({ k: 'speedcam', x: E(c), z: E(r), w: cw * T, d: rh * T, ...opts(o) });
+const gate = (c, r, cw, rh, o = {}) => ({ k: 'gate', x: E(c), z: E(r), w: cw * T, d: rh * T, ...opts(o) });
+const walker = (c, r, c1, r1, o = {}) => ({ k: 'walker', x: P(c), z: P(r), x1: P(c1), z1: P(r1), ...opts(o) });
+const finish = (c, r, label, o = {}) => ({ k: 'finish', x: P(c), z: P(r), label, ...(o.run ? { rx: P(o.run[0]), rz: P(o.run[1]) } : {}) });
+const sign = (c, r, label, flip, o = {}) => ({ k: 'sign', x: P(c), z: P(r), label, flip, ...opts(o) });
+const plat = (c, r, cw, rh, o = {}) => ({ k: 'plat', x: E(c) + 6, z: E(r) + 6, w: cw * T - 12, d: rh * T - 12, ...opts(o) });
+const banner = (c, r, cw, rh, o = {}) => ({ k: 'banner', x: E(c), z: E(r), w: cw * T, d: rh * T, ...opts(o) });
+const block = (c, r, cw, rh, o = {}) => ({ k: 'block', x: E(c) + 4, z: E(r) + 4, w: cw * T - 8, d: rh * T - 8, ...opts(o) });
+const car = (c, r, o = {}) => block(c, r, o.horiz === false ? 1 : 2, o.horiz === false ? 2 : 1, { top: 58, car: true, ...o });
 
 export const CHAPTERS = [
   { name: 'Hẻm Nhỏ', sub: '6:30 sáng · Bình Thạnh', theme: 'dawn' },
@@ -34,189 +40,287 @@ export const CHAPTERS = [
 
 export const LEVELS = [
   /* ---------- Chương 1: Hẻm Nhỏ ---------- */
-  { id: 1, ch: 0, name: 'Hẻm 42', len: 2300, build: () => [
-    txt(330, 230, '@controls', { size: 24 }),
-    txt(330, 190, 'Đi làm đúng giờ thôi mà. Dễ!', { size: 18, color: '#ffe066' }),
-    txt(640, 150, 'Ổ gà kìa. Nhảy qua đi!', { size: 18 }),
-    hole(600, 90, { sign: true }),
-    hole(820, 100, { hidden: true, trig: 720 }),
-    txt(1120, 200, 'Ổ gà bên trái. Lách sang phải nè →', { size: 18, color: '#ffe066' }),
-    hole(1250, 110, { sign: true, z0: -140, z1: 10 }),
-    hole(1250, 110, { hidden: true, trig: 1150, z0: 10, z1: 140 }),
-    dog(1500, 1850),
-    finish(2050, 'ĐẦU HẺM')
+  { id: 1, ch: 0, name: 'Hẻm 42', map: [
+    '##############',
+    '#S..........##',
+    '#...........##',
+    '###########..#',
+    '#F...........#',
+    '#............#',
+    '##############'
+  ], build: () => [
+    txt(3, 1, '@controls', { size: 18 }),
+    txt(5, 2, 'Ổ gà kìa. Nhảy qua đi!', { h: 70, size: 16 }),
+    hole(5, 1, 1, 2, { sign: true }),
+    hole(8, 1, 1, 2, { hidden: true, at: [7, 1.5], tr: 60 }),
+    txt(11, 4, 'Quẹo trái nè ↓', { h: 70, size: 16 }),
+    dog(6, 4.5, { tr: 160 }),
+    finish(1, 4.5, 'CÔNG TY')
   ] },
-  { id: 2, ch: 0, name: 'Chó Nhà Ai', len: 2900, build: () => [
-    txt(320, 200, 'Hẻm này nhiều chó lắm...', { size: 20 }),
-    dog(400, 760),
-    dog(1000, 1380, { z: -70 }), dog(1000, 1430, { z: 70 }),
-    hole(1700, 90, { sign: true }),
-    hole(1880, 90, { hidden: true, trig: 1790 }),
-    txt(2130, 160, 'Nắp cống mới thay 👍', { size: 18 }),
-    manhole(2200, -70), manhole(2200, 0), manhole(2200, 70),
-    dog(2400, 2700),
-    finish(2650, 'CHỢ')
+  { id: 2, ch: 0, name: 'Chó Nhà Ai', map: [
+    '################',
+    '#S.....#.......#',
+    '#......#.......#',
+    '#..##.....###..#',
+    '#..##.....###..#',
+    '#......#.......#',
+    '###....#....F..#',
+    '################'
+  ], build: () => [
+    txt(2, 1, 'Hẻm này nhiều chó lắm...', { size: 18 }),
+    dog(5, 2, { tr: 150 }),
+    dog(9, 1.5, { tr: 200 }), dog(11, 2, { tr: 200 }),
+    manhole(7, 2.8), manhole(7, 3.5), manhole(7, 4.2),
+    txt(7.5, 3.5, 'Nắp cống mới 👍', { h: 90, size: 16 }),
+    hole(10, 5, 1, 2, { hidden: true, at: [8.5, 5], tr: 50 }),
+    dog(14, 5, { tr: 210 }),
+    finish(12, 6, 'CHỢ', { run: [14, 1] })
   ] },
-  { id: 3, ch: 0, name: 'Đèn Đỏ Đầu Hẻm', len: 3100, build: () => [
-    txt(420, 240, 'Đèn đỏ thì dừng HẲN lại nhé', { size: 20 }),
-    light(800),
-    onc(560, { dir: 1, speed: 10 }),
-    txt(1300, 240, 'Đèn này mới sửa 🔧', { size: 20 }),
-    light(1550, { fickle: true }),
-    nails(1980, 110, { hidden: true, trig: 1860 }),
-    cart(2400, 2190, { roll: 3 }),
-    finish(2800, 'ĐƯỜNG LỚN')
+  { id: 3, ch: 0, name: 'Đèn Đỏ Đầu Hẻm', map: [
+    '######==#######',
+    '######==#######',
+    '#S....==......#',
+    '#.....==......#',
+    '######==####..#',
+    '######==####..#',
+    '######==....F.#',
+    '######==#######'
+  ], build: () => [
+    txt(3, 2, 'Đèn đỏ thì dừng HẲN lại nhé', { size: 17 }),
+    light(6, 2, 2, 2, { tr: 200 }),
+    mover('bike', 0, 0, 'R', { px: P(-2), pz: P(2.5), behind: true, aim: true, speed: 7, at: [3, 2.5], tr: 60, offset: 70 }),
+    mover('car', 0, 0, 'D', { px: P(6), pz: P(-2), every: 170, range: 1000, speed: 7 }),
+    mover('car', 0, 0, 'U', { px: P(7), pz: P(9), every: 150, range: 1000, speed: 7.5, offset: 60 }),
+    nails(10, 2, 1, 2, { hidden: true, at: [9, 2.5], tr: 50 }),
+    txt(12.5, 5, 'Đích kìa!', { h: 80, size: 16 }),
+    finish(12, 6, 'ĐƯỜNG LỚN', { run: [6.5, 6] })
   ] },
-  { id: 4, ch: 0, name: 'Chợ Sáng', len: 3400, build: () => [
-    txt(380, 220, 'Nhường người đi bộ nha', { size: 20 }),
-    walker(800, 380, { pause: 50 }),
-    walker(880, 420, { from: 1, zs: 2.2 }),
-    cart(1360, 1180),
-    cart(1520, 1230, { stopZ: 75 }),
-    txt(1850, 260, 'Ban công trồng kiểng 🌿', { size: 18 }),
-    fall(1900, 1700, 'pot'),
-    fall(2040, 1820, 'pot'),
-    hole(2930, 80, { hidden: true, trig: 2850 }),
-    finish(2600, 'CHỢ BÀ CHIỂU', { run: 380 })
+  { id: 4, ch: 0, name: 'Chợ Sáng', map: [
+    '#################',
+    '#S..............#',
+    '#...............#',
+    '#####..####..####',
+    '#####..####..####',
+    '#...............#',
+    '#..............F#',
+    '#################'
+  ], build: () => [
+    txt(3, 1, 'Chợ đông. Nhường người đi bộ nha', { size: 16 }),
+    walker(6, 0.2, 6, 3, { tr: 200, pause: 50, speed: 1.6 }),
+    walker(9, 3, 9, 0.2, { tr: 200, speed: 2 }),
+    mover('cart', 13, 0, 'D', { px: E(13), pz: P(-1), tr: 150, at: [11, 1.5], speed: 3.5, range: 210, stay: true }),
+    fall(5.5, 4, 'pot', { at: [5.5, 3.5], tr: 50 }),
+    fall(12.5, 4, 'pot', { at: [11.5, 3], tr: 60 }),
+    walker(3, 7, 3, 4.5, { tr: 180, speed: 2.2, pause: 30 }),
+    hole(9, 5, 1, 2, { hidden: true, at: [10.5, 5.5], tr: 70 }),
+    finish(15, 6, 'CHỢ BÀ CHIỂU', { run: [1, 6] })
   ] },
 
   /* ---------- Chương 2: Đường Lớn ---------- */
-  { id: 5, ch: 1, name: 'Ngược Chiều', len: 3400, build: () => [
-    txt(320, 220, 'Đường lớn rồi. An toàn hơn chứ?', { size: 22 }),
-    onc(420),
-    onc(760, { speed: 9 }),
-    pole(1450, -1, 1120, { ang: -0.55 }),
-    txt(1700, 230, 'Nghe tiếng còi phía sau không?', { size: 18 }),
-    onc(1750, { dir: 1, speed: 13 }),
-    hole(2320, 90, { sign: true }),
-    onc(2500, { lane: -50, track: 0 }), onc(2500, { lane: 50, track: 0 }),
-    finish(3100, 'NGÃ TƯ')
+  { id: 5, ch: 1, name: 'Ngược Chiều', map: [
+    '###################',
+    '#S================#',
+    '#=================#',
+    '###############===#',
+    '###############===#',
+    '#F================#',
+    '#=================#',
+    '###################'
+  ], build: () => [
+    txt(4, 1, 'Đường lớn rồi. An toàn hơn chứ?', { size: 18 }),
+    mover('bike', 0, 0, 'L', { px: P(20), pz: P(1.5), aim: true, at: [4, 1.5], tr: 60, speed: 7 }),
+    mover('bike', 0, 0, 'L', { px: P(20), pz: P(1.5), aim: true, at: [9, 1.5], tr: 60, speed: 8 }),
+    pole(13, 3, -Math.PI / 2 - 0.3, { at: [11, 1.5], tr: 60, len: 210 }),
+    mover('bike', 0, 0, 'D', { px: P(16), pz: P(-1), behind: true, aim: true, at: [16, 2.5], tr: 110, speed: 8 }),
+    mover('bike', 0, 0, 'R', { px: P(-1), pz: P(5.2), at: [12, 5.5], tr: 60, speed: 6 }),
+    mover('bike', 0, 0, 'R', { px: P(-1), pz: P(5.8), at: [12, 5.5], tr: 60, speed: 6, offset: 4 }),
+    hole(6, 5, 1, 2, { sign: true }),
+    mover('bike', 0, 0, 'R', { px: P(-2), pz: P(5.5), aim: true, at: [5, 5.5], tr: 50, speed: 10, behind: true }),
+    finish(1, 5.5, 'NGÃ TƯ')
   ] },
-  { id: 6, ch: 1, name: 'Ngã Tư Bảy Hiền', len: 3500, build: () => [
-    light(700),
-    txt(1080, 240, 'Có camera phạt nguội 📸 Tối đa 40 km/h', { size: 18 }),
-    speedcam(1300),
-    hole(1420, 80, { sign: true }),
-    onc(1650),
-    light(2150, { fickle: true }),
-    hole(2290, 80, { hidden: true, trig: 2215 }),
-    pole(2650, 1, 2420, { ang: 0.35 }),
-    finish(3150, 'XA LỘ')
+  { id: 6, ch: 1, name: 'Ngã Tư Bảy Hiền', map: [
+    '#######==#######',
+    '#######==#######',
+    '#S.....==......#',
+    '#......==......#',
+    '#######==####..#',
+    '#######==####..#',
+    '#.....F==......#',
+    '#######==#######'
+  ], build: () => [
+    light(7, 2, 2, 2, { tr: 220 }),
+    mover('car', 0, 0, 'D', { px: E(7) + 20, pz: P(-1), every: 140, range: 900, speed: 7 }),
+    mover('car', 0, 0, 'U', { px: E(8) + 20, pz: P(8), every: 160, range: 900, speed: 6, offset: 60 }),
+    txt(11, 2, 'Camera phạt nguội 📸 chạy chậm!', { size: 15 }),
+    speedcam(10, 2, 3, 2, { lim: 2.4 }),
+    hole(13, 4, 2, 1, { hidden: true, at: [13.5, 3.1], tr: 30 }),
+    light(7, 6, 2, 1, { tr: 230, fickle: true }),
+    finish(6, 6, 'XA LỘ', { run: [1, 6] })
   ] },
-  { id: 7, ch: 1, name: 'Trạm Xe Buýt', len: 3500, build: () => [
-    txt(320, 240, '🚏 TRẠM XE BUÝT', { size: 22 }),
-    txt(1300, 220, 'Triều cường 🌊', { size: 22, color: '#bfe9ff' }),
-    bus(500, 2200),
-    flood(1000, 1900),
-    onc(2550, { speed: 9 }),
-    fall(2900, 2690, 'ac'),
-    finish(3200, 'CẦU THỊ NGHÈ')
+  { id: 7, ch: 1, name: 'Trạm Xe Buýt', map: [
+    '###################',
+    '#S..##############',
+    '#...~~~~~~~~~~~...#',
+    '#...~~~~~~~~~~~...#',
+    '####~~~~~~~~~~~.###',
+    '###.~~~~~~~~~~~.F##',
+    '###################'
+  ], build: () => [
+    txt(2, 1, '🚏 Trạm xe buýt', { size: 18 }),
+    txt(9, 2.5, 'Triều cường 🌊 ngâm lâu là chết máy', { size: 15, color: '#bfe9ff' }),
+    mover('bus', 0, 0, 'R', { px: P(-4), pz: P(2.5), roof: true, top: 70, at: [2, 2], tr: 80, offset: 40, speed: 2.2, range: 1350, stay: true }),
+    mover('bike', 0, 0, 'L', { px: P(20), pz: P(3), aim: true, at: [16, 3], tr: 60, speed: 7 }),
+    fall(16, 5, 'ac', { at: [16.5, 4.5], tr: 70 }),
+    finish(16, 5, 'CẦU THỊ NGHÈ')
   ] },
-  { id: 8, ch: 1, name: 'Ô Tô Đỗ Bậy', len: 3400, build: () => [
-    txt(350, 230, 'Ô tô đỗ giữa đường. Chuyện thường ngày.', { size: 18 }),
-    car(650, { z: -58 }), car(650, { z: 58, color: '#f4d35e' }),
-    car(1100, { lane: 'curb', doorTrig: 1070, color: '#f4f4f4' }),
-    car(1320, { lane: 'curb', side: 1, doorTrig: 1290, color: '#4d7cfe' }),
-    car(1700, { drive: 1510, dspeed: -3.5, range: 320, color: '#2fa84f' }),
-    hole(2000, 80, { sign: true }),
-    txt(2230, 240, 'Băng rôn treo hơi thấp', { size: 16 }),
-    banner(2230),
-    finish(2800, 'TRUNG TÂM')
+  { id: 8, ch: 1, name: 'Ô Tô Đỗ Bậy', map: [
+    '##################',
+    '#S...............#',
+    '#................#',
+    '##############...#',
+    '#................#',
+    '#F...............#',
+    '##################'
+  ], build: () => [
+    txt(3, 1, 'Ô tô đỗ kín đường. Nhảy lên nóc!', { size: 16 }),
+    car(5, 1), car(5, 2, { color: '#f4d35e' }),
+    car(9, 1, { color: '#2fa84f' }), car(9, 2, { color: '#4d7cfe' }),
+    mover('car', 0, 0, 'L', { px: P(17), pz: P(1.5), at: [11, 1.5], tr: 80, speed: 3, range: 300, stay: true }),
+    banner(14, 4, 1, 2, { h0: 64 }),
+    txt(14, 4.5, 'Băng rôn treo thấp', { h: 120, size: 15 }),
+    hole(12, 4, 1, 2, { sign: true }),
+    car(7, 4), car(7, 5, { color: '#8e44ad' }),
+    mover('car', 0, 0, 'R', { px: P(-2), pz: P(4.5), at: [6, 4.5], tr: 200, speed: 3.5, range: 330, stay: true }),
+    finish(1, 5, 'TRUNG TÂM')
   ] },
 
   /* ---------- Chương 3: Mưa Sài Gòn ---------- */
-  { id: 9, ch: 2, name: 'Mưa Rào', len: 3200, rain: true, build: () => [
-    txt(330, 230, 'Mưa rồi! Đường trơn, phanh không ăn đâu.', { size: 18, color: '#bfe9ff' }),
-    hole(650, 80, { sign: true }),
-    manhole(1000, -60), manhole(1000, 10), manhole(1000, 80),
-    light(1500),
-    tree(1950, -1, 1650, { ang: -0.4 }),
-    tree(2120, 1, 1660, { ang: -0.2 }),
-    hole(2450, 90, { hidden: true, trig: 2360, puddle: true }),
-    finish(2850, 'CHỖ TRÚ MƯA')
+  { id: 9, ch: 2, name: 'Mưa Rào', rain: true, map: [
+    '################',
+    '#S......  .....#',
+    '#.......  .....#',
+    '######......####',
+    '######......####',
+    '#F.........  ..#',
+    '#..........  ..#',
+    '################'
+  ], build: () => [
+    txt(3, 1, 'Mưa rồi! Đường trơn, phanh không ăn.', { size: 16, color: '#bfe9ff' }),
+    manhole(5, 1.5),
+    hole(6, 3, 2, 1, { hidden: true, puddle: true, at: [6.5, 2.4], tr: 45 }),
+    tree(12, 4, Math.PI, { at: [9, 3.5], tr: 110 }),
+    tree(4, 4, Math.PI / 2, { at: [6.5, 5.5], tr: 120 }),
+    hole(2, 5, 1, 2, { hidden: true, puddle: true, at: [3.4, 5.5], tr: 40 }),
+    finish(1, 5, 'CHỖ TRÚ MƯA')
   ] },
-  { id: 10, ch: 2, name: 'Triều Cường', len: 3400, rain: true, build: () => [
-    txt(300, 230, 'Nước lên! Nhảy qua mấy cái thúng.', { size: 18, color: '#bfe9ff' }),
-    flood(520, 2600),
-    plat(600, 46, 130, { kind: 'boat', my: 6, per: 150 }),
-    plat(880, 46, 120, { kind: 'boat', my: 6, per: 170, phase: 1 }),
-    plat(1140, 46, 120, { kind: 'boat', mx: 70, per: 200 }),
-    plat(1440, 46, 120, { kind: 'boat', fall: true, delay: 22 }),
-    plat(1690, 46, 120, { kind: 'boat', my: 6, per: 160 }),
-    plat(1950, 46, 120, { kind: 'boat', mx: 60, per: 190, phase: 2 }),
-    plat(2230, 46, 130, { kind: 'boat', my: 6, per: 150 }),
-    dog(2700, 3050),
-    finish(3000, 'KHÔ RÁO', { run: 200 })
+  { id: 10, ch: 2, name: 'Triều Cường', rain: true, map: [
+    '#################',
+    '#S.            .#',
+    '#..            F#',
+    '#################'
+  ], build: () => [
+    txt(2, 1, 'Nước cuốn mất đường. Nhảy qua thúng!', { size: 15, color: '#bfe9ff' }),
+    plat(3, 1, 1, 1, { mz: 30, per: 150 }),
+    plat(5, 2, 1, 1, { mz: 30, per: 170, phase: 1 }),
+    plat(7, 1, 1, 1, { mx: 30, per: 160 }),
+    plat(9, 1.5, 1, 1, { fall: true, delay: 22 }),
+    plat(11, 2, 1, 1, { mz: 35, per: 150, phase: 2 }),
+    plat(13, 1, 1, 1, { mx: 25, per: 140 }),
+    finish(15, 2, 'KHÔ RÁO')
   ] },
-  { id: 11, ch: 2, name: 'Kẹt Xe', len: 3600, rain: true, build: () => [
-    txt(330, 230, 'Kẹt xe. Đi trên nóc xe cho nhanh.', { size: 18 }),
-    car(560, { color: '#2fa84f', z: -60 }), car(560, { color: '#4d7cfe', z: 60 }),
-    car(760, { color: '#f4f4f4', z: -60 }), car(760, { color: '#f4d35e', z: 60 }),
-    car(960, { w: 220, h: 92, truck: true, z: -56 }), car(960, { w: 220, h: 92, truck: true, z: 56 }),
-    hole(1180, 120),
-    car(1300, { color: '#e63946', z: -60 }), car(1300, { color: '#8e44ad', z: 60 }),
-    car(1680, { drive: 1470, dspeed: -3, range: 260, color: '#f4d35e' }),
-    walker(2150, 1900, { pause: 40 }),
-    banner(2600, { trig: 2380, drop: G - 70 }),
-    onc(2700, { dir: 1, speed: 13 }),
-    finish(3100, 'CẦU VƯỢT', { run: 260 })
+  { id: 11, ch: 2, name: 'Kẹt Xe', rain: true, map: [
+    '##################',
+    '#S===============#',
+    '#================#',
+    '#================#',
+    '#===============F#',
+    '##################'
+  ], build: () => [
+    txt(2, 1, 'Kẹt xe. Đi trên nóc xe cho nhanh.', { size: 16 }),
+    car(3, 1, { horiz: false }), car(3, 3, { horiz: false, color: '#4d7cfe' }),
+    block(5, 1, 2, 1, { top: 92 }), car(5, 2, { color: '#f4d35e' }), block(5, 3, 2, 2, { top: 92 }),
+    car(8, 1, { color: '#2fa84f' }), car(8, 2), car(8, 3, { color: '#8e44ad' }), car(8, 4, { color: '#f4f4f4' }),
+    mover('car', 0, 0, 'L', { px: P(19), pz: P(2.5), at: [11, 2.5], tr: 150, speed: 4, range: 500 }),
+    walker(13, 0.2, 13, 5, { tr: 160, speed: 2.4, pause: 30 }),
+    mover('bike', 0, 0, 'R', { px: P(-2), pz: P(2.5), behind: true, aim: true, at: [13, 2.5], tr: 100, speed: 9 }),
+    finish(16, 4, 'CẦU VƯỢT', { run: [16, 1] })
   ] },
-  { id: 12, ch: 2, name: 'Cây Ghét Bạn', len: 3300, rain: true, build: () => [
-    txt(330, 230, 'Hàng cây cổ thụ. Mát ghê.', { size: 20 }),
-    tree(800, -1, 520, { ang: -0.3 }),
-    tree(1250, 1, 1080, { ang: 0.3 }),
-    fall(1680, 1480, 'ac'),
-    fall(1760, 1520, 'ac'),
-    tree(2100, -1, 1830, { ang: -0.5 }),
-    nails(2330, 100),
-    hole(2580, 90, { hidden: true, trig: 2440, puddle: true }),
-    finish(2950, 'TẠNH MƯA')
+  { id: 12, ch: 2, name: 'Cây Ghét Bạn', rain: true, map: [
+    '###############',
+    '#S,,,T,,,,T,,,#',
+    '#,,,,,,,,,,,,,#',
+    '#,,T,,,,T,,,,,#',
+    '#,,,,,,,,,,,T,#',
+    '#,,,,T,,,,,,,F#',
+    '###############'
+  ], build: () => [
+    txt(2, 2, 'Công viên Tao Đàn. Mát ghê.', { size: 17 }),
+    tree(5, 1, Math.PI / 2, { at: [4.5, 2.5], tr: 100 }),
+    tree(3, 3, 0, { at: [5, 3], tr: 90 }),
+    tree(8, 3, Math.PI, { at: [7, 2], tr: 110 }),
+    tree(10, 1, Math.PI / 2 + 0.3, { at: [9.5, 2.5], tr: 120 }),
+    dog(12, 2, { tr: 160 }),
+    tree(12, 4, 0, { at: [13, 3], tr: 90, len: 170 }),
+    fall(13, 4.5, 'ac', { at: [13, 4.2], tr: 50 }),
+    finish(13, 5, 'TẠNH MƯA')
   ] },
 
   /* ---------- Chương 4: Tới Công Ty ---------- */
-  { id: 13, ch: 3, name: 'Công Trình', len: 3400, build: () => [
-    txt(330, 240, 'CÔNG TRÌNH ĐANG THI CÔNG', { size: 20, color: '#ffb703' }),
-    txt(330, 205, 'Xin lỗi vì sự bất tiện này', { size: 16 }),
-    block(600, 40, 50),
-    hole(900, 520),
-    plat(950, 60, 130, { kind: 'scaffold' }),
-    plat(1160, 75, 110, { kind: 'scaffold', my: 20, per: 150 }),
-    plat(1340, 60, 120, { kind: 'scaffold', fall: true, delay: 22 }),
-    fall(1760, 1560, 'beam'),
-    nails(2050, 100, { z0: -120, z1: 0 }),
-    nails(2050, 100, { z0: 0, z1: 120, hidden: true, trig: 1960 }),
-    hole(2290, 90, { hidden: true, trig: 2180 }),
-    finish(2750, 'CỔNG SAU')
+  { id: 13, ch: 3, name: 'Công Trình', map: [
+    '################',
+    '#S..#     #....#',
+    '#...#     #....#',
+    '#...       ..F.#',
+    '#...       ....#',
+    '################'
+  ], build: () => [
+    txt(2, 1, 'CÔNG TRÌNH ĐANG THI CÔNG', { size: 16, color: '#ffb703' }),
+    plat(4, 3, 1, 2, { kind: 'scaffold', top: 30 }),
+    plat(6, 3, 1, 2, { kind: 'scaffold', top: 30, mz: 30, per: 160 }),
+    plat(8, 3, 1, 2, { kind: 'scaffold', top: 30, fall: true, delay: 20 }),
+    plat(10, 3, 1, 2, { kind: 'scaffold', top: 30, mx: 12, per: 120 }),
+    fall(11, 3.5, 'beam', { at: [10.5, 3.5], tr: 60 }),
+    nails(12, 3, 1, 2, { hidden: true, at: [11.5, 3.5], tr: 40 }),
+    finish(13, 3, 'CỔNG SAU', { run: [13, 1] })
   ] },
-  { id: 14, ch: 3, name: 'Bãi Giữ Xe', len: 3800, build: () => [
-    txt(330, 220, 'Sắp tới rồi! Cố lên!', { size: 22 }),
-    txt(640, 300, 'Cột này nghiêng nghiêng...', { size: 16 }),
-    pole(720, 1, 500, { acc: 0.0025, len: 250, wob: 0, ang: -0.35 }),
-    hole(1100, 80, { sign: true }),
-    hole(1300, 60, { hidden: true, trig: 1190 }),
-    hole(1480, 80, { sign: true }),
-    dog(1760, 2150),
-    onc(1900),
-    gate(2560, 2380),
-    txt(2850, 200, '→ BÃI XE phía trước', { size: 20 }),
-    hole(3140, 110, { hidden: true, trig: 3000 }),
-    finish(3160, 'BÃI XE', { run: 420 })
+  { id: 14, ch: 3, name: 'Bãi Giữ Xe', map: [
+    '#################',
+    '#..............S#',
+    '#...............#',
+    '#..#########....#',
+    '#..#.......#....#',
+    '#..#.F.....#....#',
+    '#...............#',
+    '#################'
+  ], build: () => [
+    txt(13.5, 1.5, 'Sắp tới rồi! Cổng chính ↓', { size: 17 }),
+    gate(12, 3, 4, 1, { at: [13.5, 2], tr: 110 }),
+    pole(9, 3, -Math.PI / 2 - 0.25, { at: [10.5, 1.5], tr: 70 }),
+    hole(1, 4, 2, 1, { hidden: true, at: [1.5, 3.2], tr: 40 }),
+    dog(7, 6, { tr: 200 }),
+    mover('bike', 0, 0, 'L', { px: P(17), pz: P(6), aim: true, at: [5, 6], tr: 120, speed: 8 }),
+    finish(5, 5, 'BÃI XE', { run: [10, 5] })
   ] },
-  { id: 15, ch: 3, name: '8:00 Sáng', len: 4400, build: () => [
-    txt(330, 230, 'Màn cuối. Không còn gì bất ngờ nữa đâu.', { size: 18 }),
-    light(650),
-    onc(420, { dir: 1, speed: 11 }),
-    walker(1080, 760, { zs: 2.4 }),
-    walker(1150, 800, { from: 1, zs: 2.6 }),
-    speedcam(1380),
-    car(1500, { lane: 'curb', doorTrig: 1470 }),
-    fall(1900, 1720, 'ac'),
-    tree(2350, -1, 2050, { ang: -0.3 }),
-    manhole(2650, -60), manhole(2650, 10), manhole(2650, 80),
-    banner(2830),
-    gate(3150, 2980),
-    sign(3480, 'CÔNG TY', { flip: 'ĐÙA THÔI 😜', trig: 3360 }),
-    hole(3440, 100, { hidden: true, trig: 3380 }),
-    finish(3800, 'CÔNG TY', { run: 300 })
+  { id: 15, ch: 3, name: '8:00 Sáng', map: [
+    '####################',
+    '#S.......##........#',
+    '#........##........#',
+    '####==######==######',
+    '#........##........#',
+    '#..F.....==.....F..#',
+    '####################'
+  ], build: () => [
+    txt(3, 1, 'Màn cuối. Không còn gì bất ngờ nữa đâu.', { size: 15 }),
+    light(4, 3, 2, 1, { tr: 200 }),
+    mover('bike', 0, 0, 'R', { px: P(-2), pz: P(1.5), behind: true, aim: true, at: [4, 2], tr: 80, speed: 7, offset: 60 }),
+    walker(1, 4.2, 8, 4.2, { tr: 180, speed: 2.5, pause: 40, at: [4.5, 3] }),
+    sign(3, 5, 'CÔNG TY', 'ĐÙA THÔI 😜', { tr: 110 }),
+    hole(2, 5, 3, 1, { hidden: true, at: [3, 5], tr: 70 }),
+    speedcam(9, 5, 2, 1, { lim: 2.4 }),
+    fall(13, 4.5, 'ac', { at: [12, 5], tr: 80 }),
+    mover('car', 0, 0, 'D', { px: E(13), pz: P(-1), every: 120, range: 700, speed: 7, at: [14, 4], tr: 300 }),
+    tree(18, 2, Math.PI / 2, { at: [16, 4.5], tr: 120, len: 170 }),
+    manhole(17, 5),
+    finish(16, 5, 'CÔNG TY', { run: [18, 1] })
   ] }
 ];

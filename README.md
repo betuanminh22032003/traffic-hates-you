@@ -1,6 +1,6 @@
 # Traffic Hates You – bản Sài Gòn 3D
 
-Game troll-platformer 3D góc nhìn từ trên-sau lưng (kiểu Trees Hate You): chạy xe máy tới công ty trước 8:00 qua 15 màn đường phố Sài Gòn, tự do chạy tới, phanh, lách trái phải và nhảy. Thứ gì trên đường cũng ghét bạn: ổ gà tàng hình, đèn đỏ troll, cột điện đổ, chó không xích, bà cụ qua đường, xe buýt, ô tô mở cửa, đinh tặc, cục nóng máy lạnh rơi, cây đổ, triều cường, cổng công ty tự đóng... Chết là chuyện bình thường, mỗi lần chết đồng hồ chạy thêm 1 phút.
+Game troll-platformer 3D góc nhìn cao 3/4 cố định (học theo Trees Hate You): chạy xe máy tới công ty trước 8:00 qua 15 màn. Mỗi màn là một khu phố Sài Gòn nhỏ dựng như mô hình (hẻm, ngã tư, chợ, công viên, công trình...), đường đi quanh co có ngã rẽ, bạn tự do chạy 8 hướng và nhảy. Thứ gì trên đường cũng ghét bạn: ổ gà tàng hình, đèn đỏ troll, cột điện đổ, chó không xích, bà cụ qua đường, xe buýt, ô tô mở cửa, đinh tặc, cục nóng máy lạnh rơi, cây đổ, triều cường, cổng công ty tự đóng... Chết là chuyện bình thường, mỗi lần chết đồng hồ chạy thêm 1 phút.
 
 ![Traffic Hates You](public/icons/og.png)
 
@@ -19,9 +19,7 @@ Game troll-platformer 3D góc nhìn từ trên-sau lưng (kiểu Trees Hate You)
 
 | Hành động | Bàn phím | Cảm ứng | Tay cầm |
 |---|---|---|---|
-| Chạy tới | ↑ / W | kéo cần gạt lên | cần trái / D-pad lên |
-| Phanh, lùi | ↓ / S | kéo cần gạt xuống | cần trái / D-pad xuống |
-| Lách trái / phải | ← → / A D | kéo cần gạt sang ngang | cần trái / D-pad |
+| Chạy 8 hướng | ← ↑ → ↓ / W A S D | kéo cần gạt (càng kéo xa càng nhanh) | cần trái / D-pad |
 | Nhảy | Space (hoặc J, K) | nút ⤒ bên phải | A |
 | Chơi lại màn | R | menu tạm dừng | |
 | Tạm dừng | Esc / P | ❚❚ | Start |
@@ -80,8 +78,8 @@ src/main.js             vòng lặp game, luồng màn chơi, menu, input (phím
 src/game/logic.js       mô phỏng gameplay thuần (không DOM, không three.js, tất định)
 src/game/levels.js      dữ liệu 15 màn + 4 chương
 src/game/messages.js    câu thoại khi chết
-src/render/view.js      scene three.js, camera, người chơi, hạt, bong bóng thoại
-src/render/world.js     dựng phố: đường, ổ gà, vỉa hè, nhà ống, dây điện, trời, mưa
+src/render/view.js      scene three.js, camera cao 3/4, người chơi, hạt, bong bóng thoại, cảnh báo xe ngoài màn hình
+src/render/world.js     dựng khu phố từ bản đồ ô: đường, vỉa hè, cỏ, kênh, hố, nhà ống, bảng hiệu, trời, mưa
 src/render/entities.js  hình 3D cho từng loại bẫy
 src/render/models.js    mô hình (xe máy, chó, CSGT, bà cụ, xe buýt, ô tô, cây...)
 src/render/toon.js      vật liệu toon, viền, chữ vẽ bằng canvas
@@ -94,16 +92,26 @@ public/                 manifest PWA, service worker, icon
 legacy-2d.html          bản prototype 2D ban đầu (không nằm trong bản build)
 ```
 
-Logic dùng tọa độ "pixel": x chạy dọc con đường, z ngang đường (lề ở `z = ±120`), độ cao giữ quy ước bản 2D cũ (y hướng xuống, mặt đường ở `G = 440`); phần vẽ 3D đổi sang trục Y hướng lên. Camera bám sau lưng người chơi. Vì logic tất định nên bot trong `scripts/` có thể phát lại một lời giải và chứng minh màn đó qua được.
+Logic dùng tọa độ "pixel": mỗi ô bản đồ rộng `T = 80`; `x` sang phải màn hình, `z` hướng về phía camera (xuống dưới màn hình), `h` là độ cao. Phần vẽ 3D dùng thẳng X = x, Y = h, Z = z. Camera đặt cao phía trước, nhìn xuống khoảng 58° và chỉ trượt theo người chơi trong giới hạn bản đồ. Vì logic tất định nên bot trong `scripts/` có thể phát lại một lời giải và chứng minh màn đó qua được.
 
 ## Thêm hoặc sửa màn
 
-1. Mở `src/game/levels.js`, thêm một phần tử vào `LEVELS` (`id`, `ch` = chương, `name`, `len` = chiều dài, `rain` nếu trời mưa, `build` trả về danh sách bẫy).
-2. Mặc định bẫy chắn hết bề ngang đường; ổ gà, đinh, rào có thể chỉ chắn một phần bằng `z0`/`z1` (người chơi lách qua được). Ô tô, nắp cống, chó đặt theo `z`; xe ngược chiều, xe buýt và đồ rơi tự nhắm vào làn người chơi đang đi.
-3. Các bẫy có sẵn: `hole`, `light`, `pole`, `tree`, `manhole`, `dog`, `onc` (ngược chiều / vượt ẩu), `bus`, `flood`, `gate`, `finish`, `sign`, `car`, `fall` (máy lạnh, chậu kiểng, thép), `walker` (bà cụ), `cart` (xe bánh mì), `nails`, `banner`, `speedcam`, `plat` (thúng, ván, giàn giáo), `block`, `txt`.
+1. Mở `src/game/levels.js`, thêm một phần tử vào `LEVELS`: `id`, `ch` (chương), `name`, `rain` nếu trời mưa, `map` (mảng chuỗi, mỗi ký tự một ô) và `build` trả về danh sách bẫy.
+2. Ký hiệu bản đồ:
+
+   | Ký tự | Ô |
+   |---|---|
+   | `#` | nhà (tường, không đi qua được) |
+   | `T` | cây · `K` sạp, ki-ốt (cũng là tường) |
+   | `=` | lòng đường · `.` vỉa hè · `,` cỏ |
+   | `~` | nước ngập (chạy chậm, ngâm lâu thì chết máy) |
+   | ` ` (dấu cách) | kênh / hố (rơi là chết) |
+   | `S` | chỗ xuất phát · `F` đích (ô sàn) |
+
+3. Bẫy đặt theo tọa độ ô (cột, hàng), `0.5` là giữa ô. Hàm có sẵn: `hole` (ổ gà, `hidden` = tàng hình), `dog`, `mover` (car/bike/bus/cart/truck chạy thẳng theo hướng `R L U D`; `every` lặp lại, `aim` nhắm vào bạn, `stay` đỗ lại chắn đường, `roof` đứng lên nóc được), `pole`/`tree` (đổ theo góc `ang`), `fall` (máy lạnh, chậu kiểng, thép rơi đúng chỗ bạn đứng), `manhole`, `nails`, `light`, `speedcam`, `gate`, `walker` (bà cụ), `finish` (`run` = đích bỏ chạy), `sign` (đích giả), `plat` (thúng, giàn giáo; `mx/mz` di chuyển, `fall` sập), `banner`, `block`, `car` (ô tô đỗ, nhảy lên nóc được), `txt`. Tham số `at: [c, r]` và `tr` đặt điểm kích hoạt và bán kính.
 4. Thêm lời giải cho bot vào `scripts/solutions.mjs` rồi chạy `npm test`. Gỡ lỗi một màn: `node scripts/dbg.mjs <id>` in ra từng sự kiện.
 
-Số liệu vật lý tham khảo: tốc độ tối đa 6.5 px/khung (≈ 77 km/h trên đồng hồ), nhảy cao ≈ 140 px, nhảy xa ≈ 270 px khi chạy hết tốc; dây điện ở độ cao 305 px (chạm là giật điện).
+Số liệu vật lý tham khảo: tốc độ tối đa 4.4 px/khung (≈ 75 km/h trên đồng hồ), nhảy cao ≈ 84 px, nhảy xa ≈ 150 px (gần 2 ô) khi chạy hết tốc, nên hố rộng 1 ô nhảy qua được, hố 2 ô thì không; dây điện ở độ cao 250 px (bị nắp cống bắn lên là giật điện).
 
 ## Giấy phép tài nguyên
 

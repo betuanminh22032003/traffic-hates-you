@@ -1,19 +1,18 @@
-// 3D views for logic entities. Each factory returns { obj, update(e, w, t, dt), bubble?(e, w, t), behind?(e) }.
-// Logic: x along the street, z across, y grows down from the road (G). World: X = x, Y = G - y, Z = z.
+// 3D views for logic entities. Each factory returns { obj, update(e, w, t, dt), bubble?(e, w, t), billboard?, sparks?, mover? }.
+// Logic: x right, z toward the camera, h up. World: X = x, Y = h, Z = z (1:1).
 import * as THREE from 'three';
-import { G, ROADW } from '../game/logic.js';
+import { T, tileAt, isSolidTile } from '../game/logic.js';
 import { part, box, cyl, M, textPlane, canvasTex, texMat, signTex } from './toon.js';
 import * as MD from './models.js';
 import { groundMat } from './world.js';
 
-const Y = y => G - y;
-const B = (s, x, y, z = 0, size = 15) => ({ s, x, y, z, size });
+const B = (s, x, y, z, size = 15) => ({ s, x, y, z, size });
 const own = m => { m.userData.own = true; return m; };
-const clampZ = z => Math.max(-ROADW, Math.min(ROADW, z));
+const yaw = (dx, dz) => Math.atan2(-dz, dx); // rotation.y that points a +X-facing model along (dx, dz)
 function hash(n) { n = Math.round(n) | 0; n = Math.imul(n ^ (n >>> 16), 0x45d9f3b); n = Math.imul(n ^ (n >>> 16), 0x45d9f3b); n ^= n >>> 16; return (n >>> 0) / 4294967296; }
 
 let checkerTex = null;
-const checker = () => (checkerTex ??= canvasTex(256, 32, (c) => { for (let i = 0; i < 16; i++) for (let j = 0; j < 2; j++) { c.fillStyle = (i + j) % 2 ? '#fff' : '#222'; c.fillRect(i * 16, j * 16, 16, 16); } }));
+const checker = () => (checkerTex ??= canvasTex(64, 64, (c) => { for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { c.fillStyle = (i + j) % 2 ? '#fff' : '#222'; c.fillRect(i * 16, j * 16, 16, 16); } }));
 let crackTex = null;
 const cracks = () => (crackTex ??= canvasTex(128, 128, (c) => {
   c.strokeStyle = 'rgba(20,16,16,.55)'; c.lineWidth = 2.5;
@@ -21,71 +20,94 @@ const cracks = () => (crackTex ??= canvasTex(128, 128, (c) => {
   c.beginPath(); c.moveTo(58, 76); c.lineTo(62, 100); c.moveTo(40, 60); c.lineTo(34, 36); c.stroke();
 }));
 
-// Flat checkered finish line across the road.
-function finishLine() {
-  const geo = new THREE.PlaneGeometry(ROADW * 2, 16); geo.rotateX(-Math.PI / 2); geo.rotateY(Math.PI / 2);
-  const m = new THREE.Mesh(geo, own(new THREE.MeshBasicMaterial({ map: checker() })));
-  m.position.y = 0.8;
+// A free (walkable) spot just outside a rect's corners, for poles, cops and shops standing next to a trap.
+function besideRect(map, e, off = 22) {
+  const c = [[e.x - off, e.z - off], [e.x + e.w + off, e.z - off], [e.x - off, e.z + e.d + off], [e.x + e.w + off, e.z + e.d + off]];
+  for (const [x, z] of c) { const ch = tileAt(map, x, z); if (!isSolidTile(ch) && ch !== ' ') return [x, z]; }
+  return [e.x + 8, e.z + 8];
+}
+// Long axis of a rect: a model built along +X gets this length, width and yaw.
+const along = e => (e.w >= e.d ? { len: e.w, wid: e.d, rot: 0 } : { len: e.d, wid: e.w, rot: Math.PI / 2 });
+
+function shadowBlob() {
+  const m = new THREE.Mesh(new THREE.CircleGeometry(1, 20), own(new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0, depthWrite: false })));
+  m.rotation.x = -Math.PI / 2;
   return m;
 }
+
+const RIDERS = {
+  onc: { body: '#2a9d8f', helmet: '#e63946', jacket: '#6a4c93', pants: '#333' },
+  ninja: { body: '#111', helmet: '#e63946', jacket: '#ff7b25', pants: '#111' }
+};
+const CAR_COLORS = ['#e63946', '#f4d35e', '#2fa84f', '#f4f4f4', '#4d7cfe', '#8e44ad'];
 
 const V = {
   txt(e, ctx) {
     const s = e.s === '@controls'
-      ? (ctx.touch ? 'Cần gạt: chạy · lách     ⤒ nhảy' : '↑ chạy   ↓ phanh   ← → lách   SPACE nhảy')
+      ? (ctx.touch ? 'Cần gạt: chạy 8 hướng   ⤒ nhảy' : '←↑→↓ / WASD chạy   SPACE nhảy')
       : e.s;
     const m = textPlane(s, e.size * 0.95, e.color);
-    m.position.set(e.x, Y(e.y), 0);
+    m.position.set(e.x, e.h, e.z);
+    m.renderOrder = 5;
     return { obj: m, billboard: true };
   },
 
   hole(e, ctx) {
     const g = new THREE.Group();
-    const z0 = clampZ(e.z), z1 = clampZ(e.z + e.d), D = z1 - z0, zc = (z0 + z1) / 2;
     let cover = null;
     if (e.hidden) {
+      // looks exactly like the ground around it until it gives way
+      const ch = tileAt(ctx.map, e.x + e.w / 2, e.z + e.d / 2);
+      const mat = ch === '=' ? groundMat('road', ctx.th) : ch === ',' ? M(ctx.th.rain ? '#4f6a3e' : '#6f9a4a') : groundMat('walk', ctx.th);
       cover = new THREE.Group();
-      cover.add(part(box(e.w, 8, D), groundMat('road', ctx.th), { outline: false, receive: true, pos: [0, -4, 0] }));
-      const crack = new THREE.Mesh(new THREE.PlaneGeometry(e.w, D * 0.7), own(new THREE.MeshBasicMaterial({ map: cracks(), transparent: true, depthWrite: false })));
+      cover.add(part(box(e.w, 40, e.d), mat, { outline: false, receive: true, shadow: false, pos: [0, -20, 0] }));
+      const crack = new THREE.Mesh(new THREE.PlaneGeometry(e.w * 0.8, e.d * 0.6), own(new THREE.MeshBasicMaterial({ map: cracks(), transparent: true, opacity: 0.35, depthWrite: false })));
       crack.rotation.x = -Math.PI / 2; crack.position.y = 0.4; cover.add(crack);
       if (e.puddle) {
         const pud = new THREE.Mesh(new THREE.CircleGeometry(1, 24), own(new THREE.MeshBasicMaterial({ color: '#7fa6c4', transparent: true, opacity: 0.75, depthWrite: false })));
-        pud.rotation.x = -Math.PI / 2; pud.scale.set(e.w * 0.75, D * 0.42, 1); pud.position.y = 0.6; cover.add(pud);
+        pud.rotation.x = -Math.PI / 2; pud.scale.set(e.w * 0.42, e.d * 0.36, 1); pud.position.y = 0.6; cover.add(pud);
       }
-      cover.position.set(e.x + e.w / 2, 0, zc);
+      cover.position.set(e.x + e.w / 2, 0, e.z + e.d / 2);
       g.add(cover);
     }
-    if (e.sign) for (const x of [e.x - 22, e.x + e.w + 22]) for (const z of [z0 + 30, zc, z1 - 30]) { const c = MD.makeCone(); c.position.set(x, 0, z); g.add(c); }
+    if (e.sign) for (const [x, z] of [[e.x - 12, e.z + e.d * 0.25], [e.x - 12, e.z + e.d * 0.75], [e.x + e.w + 12, e.z + e.d * 0.25], [e.x + e.w + 12, e.z + e.d * 0.75]]) {
+      if (isSolidTile(tileAt(ctx.map, x, z))) continue;
+      const c = MD.makeCone(); c.position.set(x, 0, z); c.scale.setScalar(0.8); g.add(c);
+    }
     let vy = 0, fallen = 0;
     return {
       obj: g,
       update(e, w, t, dt) {
-        if (!cover || !e.open || fallen > 400) return;
+        if (!cover || !e.open || fallen > 300) return;
         vy += 0.9 * dt; fallen += vy * dt;
-        cover.position.y = -fallen; cover.rotation.z = Math.min(0.5, fallen * 0.004);
-        if (fallen > 400) cover.visible = false;
+        cover.position.y = -fallen; cover.rotation.z = Math.min(0.4, fallen * 0.004); cover.rotation.x = Math.min(0.3, fallen * 0.003);
+        if (fallen > 300) cover.visible = false;
       }
     };
   },
 
-  light(e) {
+  light(e, ctx) {
     const g = new THREE.Group();
-    const heads = [-1, 1].map(s => { const tl = MD.makeTrafficLight(); tl.g.position.set(e.x + 22, 14, s * (ROADW + 12)); tl.g.rotation.y = -Math.PI / 2; g.add(tl.g); return tl; });
-    g.add(part(box(6, 1, ROADW * 2), '#f5f5f5', { pos: [e.x - 3, 0.6, 0], outline: false, shadow: false }));
-    for (let z = -ROADW + 18; z < ROADW; z += 30) g.add(part(box(94, 1, 14), '#f5f5f5', { pos: [e.x + 63, 0.6, z], outline: false, shadow: false }));
-    const cop = MD.makeCop(); cop.g.position.set(e.x + 130, 14, ROADW + 34); cop.g.rotation.y = Math.PI / 2 + 0.6; g.add(cop.g);
+    const cx = e.x + e.w / 2, cz = e.z + e.d / 2;
+    // zebra crossing: bars run along the shorter side of the rect
+    if (e.w >= e.d) for (let x = e.x + 10; x < e.x + e.w - 8; x += 22) g.add(part(box(12, 1, e.d - 14), '#f5f5f5', { pos: [x + 6, 0.6, cz], outline: false, shadow: false }));
+    else for (let z = e.z + 10; z < e.z + e.d - 8; z += 22) g.add(part(box(e.w - 14, 1, 12), '#f5f5f5', { pos: [cx, 0.6, z + 6], outline: false, shadow: false }));
+    const [lx, lz] = besideRect(ctx.map, e, 18);
+    const tl = MD.makeTrafficLight(); tl.g.position.set(lx, 0, lz); tl.g.scale.setScalar(0.7); g.add(tl.g);
+    const [kx, kz] = besideRect(ctx.map, { ...e, x: e.x - 30, w: e.w + 60 }, 30);
+    const cop = MD.makeCop(); cop.g.position.set(kx, 0, kz); cop.g.rotation.y = yaw(kx - cx, kz - cz); cop.g.scale.setScalar(0.85); g.add(cop.g);
     return {
       obj: g,
       update(e) {
         const red = e.st === 'red';
         const n = e.st === 'idle' ? '12' : red ? String(Math.max(1, Math.ceil((110 - e.t) / 22))) : e.st === 'fake' ? '0' : '--';
-        for (const h of heads) h.set(red, n);
+        tl.set(red, n);
         cop.alert(e.caught);
       },
       bubble(e, w) {
-        if (e.caught) return B('TẤP VÀO!', e.x + 130, 128, ROADW + 34, 16);
-        if (e.st === 'red' && Math.abs(w.p.vx) > 0.35 && w.p.x > e.x - 260) return B('Dừng hẳn lại!', e.x + 130, 128, ROADW + 34, 14);
-        if (e.st === 'fake') return B('Xanh rồi... hả?', e.x + 130, 128, ROADW + 34, 14);
+        if (e.caught) return B('TẤP VÀO!', kx, 110, kz, 16);
+        if (e.st === 'red' && Math.hypot(w.p.vx, w.p.vz) > 0.35) return B('Dừng hẳn lại!', kx, 110, kz, 14);
+        if (e.st === 'fake') return B('Xanh rồi... hả?', kx, 110, kz, 14);
       }
     };
   },
@@ -93,7 +115,8 @@ const V = {
   pole(e) {
     const g = new THREE.Group();
     g.add(e.kind === 'tree' ? MD.makeTree(e.len) : MD.makeElectricPole(e.len));
-    g.position.set(e.x, 0, e.zb);
+    g.position.set(e.x, 0, e.z);
+    // tip the +Y axis toward (dx, dz)
     const axis = new THREE.Vector3(e.dz, 0, -e.dx).normalize();
     return {
       obj: g,
@@ -101,6 +124,7 @@ const V = {
         const wob = e.st === 1 && e.wob > 0 ? Math.sin(t * 1.6) * 0.06 : 0;
         g.quaternion.setFromAxisAngle(axis, e.a + wob);
       },
+      bubble(e) { if (e.st === 1 && e.wob > 0) return { s: e.kind === 'tree' ? 'rắc... rắc...' : 'kẽo kẹt...', x: e.x, y: e.len * 0.7, z: e.z, size: 15, plain: true }; },
       sparks: e.kind !== 'tree'
     };
   },
@@ -108,10 +132,10 @@ const V = {
   manhole(e) {
     const g = new THREE.Group(); g.position.set(e.x, 0, e.z);
     const lid = new THREE.Group();
-    lid.add(part(cyl(26, 26, 3, 20), '#55555e', { pos: [0, 1.5, 0] }));
-    for (const dx of [-12, 0, 12]) lid.add(part(box(4, 1, 14), '#3a3a40', { pos: [dx, 3.2, 0], outline: false }));
+    lid.add(part(cyl(24, 24, 3, 20), '#55555e', { pos: [0, 1.5, 0] }));
+    for (const dx of [-11, 0, 11]) lid.add(part(box(4, 1, 13), '#3a3a40', { pos: [dx, 3.2, 0], outline: false }));
     g.add(lid);
-    const holeDisk = new THREE.Mesh(new THREE.CircleGeometry(24, 20), own(new THREE.MeshBasicMaterial({ color: '#1a1410' })));
+    const holeDisk = new THREE.Mesh(new THREE.CircleGeometry(22, 20), own(new THREE.MeshBasicMaterial({ color: '#1a1410' })));
     holeDisk.rotation.x = -Math.PI / 2; holeDisk.position.y = 0.5; holeDisk.visible = false; g.add(holeDisk);
     const water = new THREE.Mesh(cyl(10, 16, 1, 16), own(new THREE.MeshStandardMaterial({ color: '#78c8ff', transparent: true, opacity: 0.85, roughness: 0.1 })));
     water.visible = false; g.add(water);
@@ -120,21 +144,21 @@ const V = {
       update(e) {
         if (e.st === 0) return;
         holeDisk.visible = true;
-        const h = Math.min(420, e.t * 30) * Math.max(0, 1 - Math.max(0, e.t - 50) / 40);
+        const h = Math.min(300, e.t * 24) * Math.max(0, 1 - Math.max(0, e.t - 50) / 40);
         water.visible = h > 2; water.scale.y = Math.max(0.01, h); water.position.y = h / 2;
-        lid.position.set(e.t * 1.5, Math.min(520, e.t * 16), 0); lid.rotation.set(e.t * 0.3, 0, e.t * 0.2);
+        lid.position.set(e.t * 1.2, Math.min(380, e.t * 14), -e.t * 0.6); lid.rotation.set(e.t * 0.3, 0, e.t * 0.2);
       }
     };
   },
 
   dog(e) {
     const d = MD.makeDog();
-    let pz = e.z;
+    d.g.rotation.y = Math.PI * 0.85;
     return {
       obj: d.g,
-      update(e, w, t, dt) {
+      update(e, w, t) {
         d.g.position.set(e.x, 0, e.z);
-        const run = e.on && e.t > 22;
+        const run = e.on && e.t > 18 && e.t < e.life;
         if (!e.on) {
           d.g.scale.set(1, 0.62, 1); d.head.rotation.z = -0.3;
           for (const l of d.legs) l.rotation.z = 1.3;
@@ -143,239 +167,166 @@ const V = {
           d.legs.forEach((l, i) => { l.rotation.z = run ? Math.sin(t * 0.5 + i * 1.7) * 0.7 : 0; });
           d.g.position.y = run ? Math.abs(Math.sin(t * 0.5)) * 4 : 0;
           d.tail.rotation.z = Math.sin(t * 0.8) * 0.5;
-          if (dt) { d.g.rotation.y = Math.atan2(e.z - pz, 5.6 * dt) * 0.8; pz = e.z; }
+          if (e.ang !== undefined) d.g.rotation.y = yaw(Math.cos(e.ang), Math.sin(e.ang)) + Math.PI; // model faces -X
         }
       },
       bubble(e, w, t) {
         if (!e.on) return { s: 'z z z', x: e.x + 10, y: 46 + Math.sin(t * 0.06) * 4, z: e.z, size: 16, plain: true };
-        if (e.t < 40) return B('GÂU GÂU!', e.x - 10, 56, e.z, 14);
+        if (e.t < 40) return B('GÂU GÂU!', e.x, 60, e.z, 14);
+        if (e.t > e.life && e.t < e.life + 60) return B('...thôi mệt', e.x, 60, e.z, 13);
       }
     };
   },
 
-  onc(e) {
-    const ninja = e.dir > 0;
-    const r = MD.makeRider(ninja
-      ? { body: '#111', helmet: '#e63946', jacket: '#ff7b25', pants: '#111' }
-      : { body: '#2a9d8f', helmet: '#e63946', jacket: '#6a4c93', pants: '#333' });
-    r.g.rotation.y = ninja ? 0 : Math.PI;
-    r.g.visible = false;
+  mover(e) {
+    const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner);
+    let wheels = [], rider = null;
+    const color = e.color ?? CAR_COLORS[Math.floor(hash(e.x * 7 + e.z * 13) * CAR_COLORS.length)];
+    if (e.kind === 'bike') {
+      rider = MD.makeRider(e.behind ? RIDERS.ninja : RIDERS.onc); inner.add(rider.g);
+    } else if (e.kind === 'cart') {
+      inner.add(MD.makeCart().g);
+    } else if (e.kind === 'bus') {
+      const b = MD.makeBus(e.len, e.top - 4); b.g.position.x = -e.len / 2; b.g.scale.z = e.wid / 110; inner.add(b.g); wheels = b.wheels;
+    } else {
+      const c = MD.makeCar(e.len, e.top, color, { truck: e.kind === 'truck', taxi: color === '#2fa84f' || color === '#f4f4f4' });
+      c.g.position.x = -e.len / 2; c.g.scale.z = e.wid / 96; inner.add(c.g); wheels = c.wheels;
+    }
+    g.rotation.y = yaw(e.dx, e.dz);
+    g.visible = false;
     return {
-      obj: r.g,
+      obj: g, mover: true,
       update(e) {
-        r.g.visible = e.on;
+        g.visible = e.on;
         if (!e.on) return;
-        r.g.position.set(e.x, 0, e.z);
-        r.spin(e.t * 0.6); r.lean(0.12);
+        g.position.set(e.cx, 0, e.cz);
+        if (rider) { rider.spin(e.travel / 13); rider.lean(e.stopped ? 0 : 0.12); }
+        for (const wh of wheels) wh.rotation.z = -e.travel / 14;
       },
-      bubble(e, w) { if (e.on && e.t < 90 && (ninja || e.x > w.p.x + 40)) return B(ninja ? 'BÍÍP! TRÁNH!' : 'TRÁNH RA!', e.x, 100, e.z, 15); },
-      behind(e) { return e.on && ninja ? e.x : null; }
-    };
-  },
-
-  bus(e) {
-    const b = MD.makeBus(e.len, e.h); b.g.visible = false;
-    return {
-      obj: b.g,
-      update(e) {
-        b.g.visible = e.on;
+      bubble(e) {
         if (!e.on) return;
-        b.g.position.set(e.x, 0, e.z + e.D / 2);
-        for (const wh of b.wheels) wh.rotation.z = -e.x / 15;
-      },
-      bubble(e) { if (e.on && e.vx === 0) return B('Hết giờ chạy!', e.x + e.len - 24, e.h + 8, e.z + e.D / 2, 14); },
-      behind(e) { return e.on ? e.x + e.len : null; },
-      spray(e) { return e.on && e.vx > 0.5 ? [e.x + e.len - 10, e.z + e.D / 2] : null; }
-    };
-  },
-
-  flood(e) {
-    const w = e.x1 - e.x0, D = 560, segs = Math.max(8, Math.ceil(w / 20));
-    const geo = new THREE.BoxGeometry(w, 34, D, segs, 1, 1);
-    const pos = geo.attributes.position, base = Float32Array.from(pos.array);
-    const water = new THREE.Mesh(geo, own(new THREE.MeshStandardMaterial({ color: '#3f7fa8', transparent: true, opacity: 0.8, roughness: 0.08, metalness: 0.1 })));
-    water.position.set((e.x0 + e.x1) / 2, 30 - 17, 0); water.renderOrder = 2;
-    const g = new THREE.Group(); g.add(water);
-    const slipper = part(new THREE.CapsuleGeometry(5, 14, 3, 8), '#ff6fae', { rot: [0, 0, Math.PI / 2] });
-    g.add(slipper);
-    return {
-      obj: g,
-      update(e, w, t) {
-        for (let i = 0; i < pos.count; i++) {
-          if (base[i * 3 + 1] > 0) {
-            const x = base[i * 3] + water.position.x, z = base[i * 3 + 2];
-            pos.array[i * 3 + 1] = base[i * 3 + 1] + Math.sin(x * 0.05 + z * 0.02 + t * 0.08) * 4;
-          }
+        const y = e.top + 40;
+        if (e.stopped) return e.kind === 'bus' ? B('Hết giờ chạy!', e.cx, y, e.cz, 14) : B('Đỗ đây tí nha', e.cx, y, e.cz, 13);
+        if (e.t < 70) {
+          if (e.kind === 'bike') return B(e.behind ? 'BÍÍP! TRÁNH!' : 'TRÁNH RA!', e.cx, y, e.cz, 15);
+          if (e.kind === 'bus') return B('Lên xe không?', e.cx, y, e.cz, 14);
+          if (e.kind === 'cart') return B('Bánh mì nóng giòn!', e.cx, y, e.cz, 14);
+          return B('BÍP BÍP!', e.cx, y, e.cz, 14);
         }
-        pos.needsUpdate = true;
-        slipper.position.set(e.x0 + 300 + Math.sin(t * 0.02) * 30, 32 + Math.sin(t * 0.08) * 3, 60);
-      },
-      bubble(e, w) { if (w.p.water && w.status === 'play') return B(w.p.wt > 45 ? 'Sắp chết máy!!' : 'Bì bõm...', w.p.x, Y(w.p.y) + 80, w.p.z, 14); }
+      }
     };
   },
 
   gate(e) {
-    const g = new THREE.Group();
-    const facade = canvasTex(256, 192, (c, W, H) => {
-      c.fillStyle = '#dfe7ef'; c.fillRect(0, 0, W, H);
-      for (let r = 0; r < 4; r++) for (let k = 0; k < 6; k++) { c.fillStyle = (r + k) % 3 ? '#7fb3e6' : '#a9cdf0'; c.fillRect(10 + k * 41, 12 + r * 36, 32, 26); }
-    });
-    const wall = M('#dfe7ef');
-    // company building on the left, sign facing the street
-    g.add(part(box(440, 320, 200), [wall, wall, wall, wall, texMat(facade), wall], { pos: [e.x + 65, 160, -ROADW - 140 - 100 + 12] }));
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(400, 36), texMat(signTex('CÔNG TY TNHH ĐI LÀM ĐÚNG GIỜ', { w: 1024, h: 96, bg: '#e63946', size: 52 })));
-    sign.position.set(e.x + 65, 340, -ROADW - 126); g.add(sign);
-    g.add(part(box(404, 40, 8), '#e63946', { pos: [e.x + 65, 340, -ROADW - 131] }));
-    // gate frame over the street
-    const frame = new THREE.Group(); g.add(frame);
-    for (const z of [-ROADW - 6, ROADW + 6]) frame.add(part(box(24, 120, 24), '#c0c4ca', { pos: [e.x, 60, z] }));
-    frame.add(part(box(20, 20, ROADW * 2 + 36), '#c0c4ca', { pos: [e.x, 128, 0] }));
-    const barGeo = box(18, 74, ROADW * 2); barGeo.translate(0, 37, 0);
-    const bar = part(barGeo, '#c0c4ca'); bar.position.set(e.x, 0, 0); bar.scale.y = 0.001; g.add(bar);
-    for (const y of [20, 50]) { const st = part(box(19, 8, ROADW * 2 + 1), '#e63946', { outline: false }); st.position.y = y; bar.add(st); }
-    const guard = MD.makeGuard(); guard.position.set(e.x + 50, 14, ROADW + 30); guard.rotation.y = Math.PI / 2 + 0.5; g.add(guard);
+    const g = new THREE.Group(), { len, rot } = along(e);
+    const frame = new THREE.Group(); frame.position.set(e.x + e.w / 2, 0, e.z + e.d / 2); frame.rotation.y = rot; g.add(frame);
+    for (const x of [-len / 2 - 8, len / 2 + 8]) frame.add(part(box(18, 96, 18), '#c0c4ca', { pos: [x, 48, 0] }));
+    const barGeo = box(len, 74, 14); barGeo.translate(0, 37, 0);
+    const bar = part(barGeo, '#c0c4ca'); bar.scale.y = 0.001; frame.add(bar);
+    for (const y of [20, 50]) { const st = part(box(len + 1, 8, 15), '#e63946', { outline: false }); st.position.y = y; bar.add(st); }
+    const guard = MD.makeGuard(); guard.position.set(-len / 2 - 30, 0, 26); guard.rotation.y = -Math.PI / 2; frame.add(guard);
+    const gp = new THREE.Vector3();
     return {
       obj: g,
       update(e) { bar.scale.y = Math.max(0.001, e.a); bar.visible = e.a > 0.01; },
-      bubble(e) { if (e.st) return B('HẾT CHỖ! Ra bãi sau!', e.x + 50, 112, ROADW + 30, 15); },
-      overhead: [frame]
+      bubble(e) { if (e.st) { guard.getWorldPosition(gp); return B('HẾT CHỖ! Đi cổng khác!', gp.x, 120, gp.z, 15); } }
     };
   },
 
   finish(e) {
     const g = new THREE.Group();
-    const a = MD.makeArch(e.label); g.add(a.g);
-    const line = finishLine(); g.add(line);
-    const overhead = [a.g];
+    const a = MD.makeArch(e.label, { h: 150, half: 56 }); a.g.rotation.y = Math.PI / 2; g.add(a.g);
+    const pad = new THREE.Mesh(new THREE.PlaneGeometry(T - 12, T - 12), own(new THREE.MeshBasicMaterial({ map: checker() })));
+    pad.rotation.x = -Math.PI / 2; pad.position.y = 0.8; g.add(pad);
     const legs = a.posts.map(p => { const l = new THREE.Group(); l.add(part(new THREE.CapsuleGeometry(4, 26, 3, 6), '#8d6e63', { pos: [0, -14, 0] })); l.position.y = 24; l.visible = false; p.add(l); return l; });
     return {
       obj: g,
       update(e, w, t) {
-        const moving = e.tx !== null && e.x < e.tx;
-        a.g.position.set(e.x, moving ? 16 + Math.abs(Math.sin(t * 0.6)) * 6 : 0, 0);
-        line.position.x = e.x; line.visible = !moving;
-        legs.forEach((l, i) => { l.visible = moving; l.rotation.z = moving ? Math.sin(t * 0.6 + i * Math.PI) * 0.6 : 0; });
+        g.position.set(e.x, 0, e.z);
+        a.g.position.y = e.moving ? 16 + Math.abs(Math.sin(t * 0.6)) * 6 : 0;
+        pad.visible = !e.moving;
+        legs.forEach((l, i) => { l.visible = e.moving; l.rotation.x = e.moving ? Math.sin(t * 0.6 + i * Math.PI) * 0.6 : 0; });
       },
       bubble(e) {
-        const moving = e.tx !== null && e.x < e.tx;
-        if (moving) return B('hehe 😜', e.x, 220, 0, 15);
-        if (e.ran) return B('ok ok, vào đi', e.x, 220, 0, 14);
-      },
-      overhead
+        if (e.moving) return B('hehe 😜', e.x, 190, e.z, 15);
+        if (e.ran) return B('ok ok, vào đi', e.x, 190, e.z, 14);
+      }
     };
   },
 
   sign(e) {
     const g = new THREE.Group();
-    const a = MD.makeArch(e.label); a.g.position.x = e.x; g.add(a.g);
-    const line = finishLine(); line.position.x = e.x; g.add(line);
+    const a = MD.makeArch(e.label, { h: 150, half: 56 }); a.g.rotation.y = Math.PI / 2; a.g.position.set(e.x, 0, e.z); g.add(a.g);
+    const pad = new THREE.Mesh(new THREE.PlaneGeometry(T - 12, T - 12), own(new THREE.MeshBasicMaterial({ map: checker() })));
+    pad.rotation.x = -Math.PI / 2; pad.position.set(e.x, 0.8, e.z); g.add(pad);
     let shown = false;
     return {
       obj: g,
-      overhead: [a.g],
-      update(e) { if (e.flipped && !shown) { shown = true; a.setLabel(e.flip); line.visible = false; } },
-      bubble(e) { if (e.flipped) return B('Đích thật ở phía trước nha 😜', e.x, 225, 0, 14); }
-    };
-  },
-
-  car(e) {
-    const g = new THREE.Group();
-    const c = MD.makeCar(e.w, e.h, e.color ?? '#e63946', { truck: e.truck, taxi: e.color === '#2fa84f' || e.color === '#f4f4f4' });
-    c.g.position.set(e.x, 0, e.z);
-    g.add(c.g);
-    let door = null;
-    if (e.lane === 'curb') {
-      door = new THREE.Group(); door.position.set(e.x + e.w * 0.62 + 40, 0, e.z - e.side * (e.D / 2 + 1.5)); g.add(door);
-      door.add(part(box(40, 26, 3), e.color ?? '#e63946', { pos: [-20, 30, 0] }));
-      door.add(part(box(24, 12, 1), '#2b4a6b', { pos: [-20, 48, 0], outline: false }));
-    }
-    return {
-      obj: g,
-      update(e) {
-        if (e.lane === 'road') { c.g.position.x = e.x; for (const wh of c.wheels) wh.rotation.z = -(e.x - e.x0) / 13; }
-        if (door) door.rotation.y = -e.side * e.door * 1.25;
-      },
-      bubble(e) {
-        if (e.lane === 'road' && e.on && Math.abs(e.vx) > 0.2) return B('Lùi nè! Bíp bíp!', e.x + e.w / 2, e.h + 30, e.z, 14);
-        if (e.lane === 'curb' && e.door > 0) return B('Ủa, có người hả?', e.x + e.w * 0.5, e.h + 30, e.z, 14);
-      }
+      update(e) { if (e.flipped && !shown) { shown = true; a.setLabel(e.flip); pad.visible = false; } },
+      bubble(e) { if (e.flipped) return B('Đích thật ở chỗ khác nha 😜', e.x, 190, e.z, 14); }
     };
   },
 
   fall(e) {
     const g = new THREE.Group();
-    const obj = e.kind === 'pot' ? MD.makePot() : e.kind === 'beam' ? MD.makeBeam(e.w) : MD.makeAC();
-    g.add(obj);
-    const startBottom = Y(e.y + e.h);
-    const overhead = [];
-    const perch = e.kind === 'beam' ? 0 : -150; // sits on the balcony until it gets knocked off
-    let rope = null, zv = e.kind === 'beam' ? e.z : perch;
+    const obj = e.kind === 'pot' ? MD.makePot() : e.kind === 'beam' ? MD.makeBeam(e.size) : MD.makeAC();
+    obj.visible = false; g.add(obj);
+    let rope = null;
     if (e.kind === 'beam') {
       rope = new THREE.Group();
       rope.add(part(cyl(1.5, 1.5, 1200, 6), '#333', { outline: false, pos: [0, 624, 0] }));
       rope.add(part(new THREE.TorusGeometry(8, 2, 6, 12, Math.PI * 1.4), '#777', { pos: [0, 32, 0] }));
-      rope.position.set(e.x, startBottom, e.z); g.add(rope);
-    } else {
-      const bal = MD.makeBalcony(); bal.position.set(e.x, startBottom, 0); g.add(bal); overhead.push(bal);
+      rope.visible = false; g.add(rope);
     }
-    const blob = new THREE.Mesh(new THREE.CircleGeometry(1, 20), own(new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0, depthWrite: false })));
-    blob.rotation.x = -Math.PI / 2; blob.position.set(e.x, 0.9, 0); g.add(blob);
+    const blob = shadowBlob(); g.add(blob);
     return {
       obj: g,
-      update(e, w, t, dt) {
-        zv += ((e.st === 0 && e.kind !== 'beam' ? perch : e.z) - zv) * Math.min(1, 0.12 * (dt || 1));
-        obj.position.set(e.x, Y(e.y + e.h), zv);
-        if (rope) rope.position.z = zv;
+      update(e) {
+        obj.visible = e.st > 0;
+        if (e.st === 0) return;
+        obj.position.set(e.x, e.y, e.z);
         obj.rotation.z = e.st === 1 ? Math.sin(e.y * 0.05) * 0.15 : 0;
-        const k = e.st === 1 ? Math.min(1, (e.y - (G - 330)) / 280) : 0;
-        blob.material.opacity = k * 0.45; blob.scale.setScalar(e.w * 0.6 * (0.4 + k)); blob.position.z = zv;
+        if (rope) { rope.visible = true; rope.position.set(e.x, e.y, e.z); }
+        const k = e.st === 1 ? Math.min(1, (330 - e.y) / 300) : 0;
+        blob.material.opacity = k * 0.5; blob.scale.setScalar(e.size * 0.6 * (0.4 + k)); blob.position.set(e.x, 0.9, e.z);
       },
-      bubble(e) { if (e.st === 1) return B('ỐI ỐI!', e.x + 30, 300, zv, 15); },
-      overhead
+      bubble(e) { if (e.st === 1) return B(e.kind === 'beam' ? 'Ê, CẨN THẬN!' : 'ỐI ỐI!', e.x, e.y + 80, e.z, 15); }
     };
   },
 
   walker(e) {
     const gr = MD.makeGranny();
+    gr.g.rotation.y = yaw(e.x1 - e.x, e.z1 - e.z);
     return {
       obj: gr.g,
       update(e, w, t) {
-        gr.g.position.set(e.x, Math.abs(e.z) > ROADW ? 14 : 0, e.z);
-        const walking = e.st === 1 && !(Math.abs(e.z) < 4 && e.pauseT > 0);
+        gr.g.position.set(e.x, 0, e.z);
+        const walking = e.st === 1 && !(e.pauseT > 0 && e.dx !== undefined && Math.abs(e.t - Math.hypot(e.x1 - e.sx, e.z1 - e.sz) / 2) < 1);
         gr.legs.forEach((l, i) => { l.rotation.z = walking ? Math.sin(t * 0.25 + i * Math.PI) * 0.5 : 0; });
         gr.arm.rotation.z = e.hit ? Math.sin(t * 0.9) * 1.6 + 1.6 : 0;
-        gr.g.rotation.y = e.hit ? Math.PI : -Math.sign(e.zs) * Math.PI / 2;
+        if (e.hit) gr.g.rotation.y = yaw(w.p.x - e.x, w.p.z - e.z);
       },
       bubble(e) {
-        if (e.hit) return B('MẤT DẠY!', e.x, 120, e.z, 16);
-        if (e.st === 1 && Math.abs(e.z) < 4 && e.pauseT > 0) return B('Ủa quên mua hành...', e.x, 120, e.z, 14);
-        if (e.st === 1) return B('Từ từ con ơi...', e.x, 120, e.z, 14);
+        if (e.hit) return B('MẤT DẠY!', e.x, 110, e.z, 16);
+        if (e.st === 1 && e.pauseT > 0 && Math.abs(e.t - Math.hypot(e.x1 - e.sx, e.z1 - e.sz) / 2) < 1) return B('Ủa quên mua hành...', e.x, 110, e.z, 14);
+        if (e.st === 1) return B('Từ từ con ơi...', e.x, 110, e.z, 14);
       }
     };
   },
 
-  cart(e) {
-    const c = MD.makeCart();
-    return {
-      obj: c.g,
-      update(e) { c.g.position.set(e.x, Math.abs(e.z) > ROADW ? 14 : 0, e.z); },
-      bubble(e) { if (e.st === 1 || e.vx) return B('Bánh mì nóng giòn!', e.x, 110, e.z, 14); }
-    };
-  },
-
-  nails(e) {
+  nails(e, ctx) {
     const g = new THREE.Group();
-    const z0 = clampZ(e.z), z1 = clampZ(e.z + e.d);
-    const n = Math.ceil(e.w * (z1 - z0) / 900);
+    const n = Math.ceil(e.w * e.d / 700);
     const nails = new THREE.Group();
     for (let i = 0; i < n; i++) {
       const m = new THREE.Mesh(new THREE.ConeGeometry(2.4, 9, 5), M('#c5cbd3'));
-      m.position.set(e.x + hash(i * 7 + e.x) * e.w, 3, z0 + hash(i * 13 + e.x) * (z1 - z0));
+      m.position.set(e.x + 4 + hash(i * 7 + e.x) * (e.w - 8), 3, e.z + 4 + hash(i * 13 + e.z) * (e.d - 8));
       m.rotation.set((hash(i) - 0.5) * 0.8, 0, (hash(i * 3) - 0.5) * 0.8);
       nails.add(m);
     }
     g.add(nails);
-    const shop = MD.makeTireShop(); shop.position.set(e.x + e.w / 2, 14, ROADW + 70); shop.rotation.y = Math.PI / 2; g.add(shop);
+    const [sx, sz] = besideRect(ctx.map, e, 26);
+    const shop = MD.makeTireShop(); shop.position.set(sx, 0, sz); shop.scale.setScalar(0.8); g.add(shop);
     let appear = e.hidden ? 0 : 1;
     return {
       obj: g,
@@ -383,36 +334,34 @@ const V = {
         if (e.vis) appear = Math.min(1, appear + 0.12 * dt);
         nails.visible = appear > 0; nails.scale.set(1, Math.max(0.01, appear), 1);
       },
-      bubble(e, w) { if (e.vis && e.hidden && w.p.x > e.trig - 40 && w.p.x < e.x + e.w + 200) return B('Vá xe không em?', e.x + e.w / 2 + 30, 115, ROADW + 70, 14); }
+      bubble(e, w) { if (e.vis && e.hidden && Math.hypot(w.p.x - sx, w.p.z - sz) < 260) return B('Vá xe không em?', sx, 100, sz, 14); }
     };
   },
 
   banner(e) {
-    const g = new THREE.Group();
-    for (const z of [-ROADW - 8, ROADW + 8]) g.add(part(cyl(3, 3, 260, 8), '#8d6e63', { pos: [e.x, 130, z] }));
+    const g = new THREE.Group(), { len, rot } = along(e);
+    const fr = new THREE.Group(); fr.position.set(e.x + e.w / 2, 0, e.z + e.d / 2); fr.rotation.y = rot; g.add(fr);
+    const top = e.h0 + e.hh;
+    for (const x of [-len / 2 - 4, len / 2 + 4]) fr.add(part(cyl(3, 3, top + 30, 8), '#8d6e63', { pos: [x, (top + 30) / 2, 0] }));
     const tex = signTex('NHIỆT LIỆT CHÀO MỪNG', { w: 1024, h: 128, bg: '#e63946', fg: '#ffd23f', size: 76, border: false });
     const red = M('#e63946');
-    const cloth = part(box(5, e.h, ROADW * 2 + 12), [texMat(tex), texMat(tex), red, red, red, red]);
-    g.add(cloth);
-    const rope = part(box(1.5, 1.5, ROADW * 2 + 16), '#333', { outline: false }); g.add(rope);
-    return {
-      obj: g,
-      update(e, w, t) {
-        const top = Y(e.cur);
-        cloth.position.set(e.x, top - e.h / 2, 0); cloth.rotation.x = Math.sin(t * 0.05) * 0.03;
-        rope.position.set(e.x, top + 2, 0);
-      }
-    };
+    fr.add(part(box(len + 4, e.hh, 4), [red, red, red, red, texMat(tex), texMat(tex)], { pos: [0, e.h0 + e.hh / 2, 0] }));
+    fr.add(part(box(len + 12, 1.5, 1.5), '#333', { outline: false, pos: [0, top + 2, 0] }));
+    return { obj: g };
   },
 
-  speedcam(e) {
-    const s = MD.makeSpeedSign(); s.g.position.set(e.x, 14, ROADW + 14); s.g.rotation.y = -Math.PI / 2;
-    const line = part(box(6, 1, ROADW * 2), '#ffd23f', { outline: false, shadow: false, pos: [e.x, 0.7, 0] });
-    const g = new THREE.Group(); g.add(s.g, line);
+  speedcam(e, ctx) {
+    const g = new THREE.Group();
+    const [sx, sz] = besideRect(ctx.map, e, 20);
+    const s = MD.makeSpeedSign(); s.g.position.set(sx, 0, sz); s.g.scale.setScalar(0.7); g.add(s.g);
+    // painted zone markings
+    for (const [x, z, w, d] of [[e.x + e.w / 2, e.z + 2, e.w, 4], [e.x + e.w / 2, e.z + e.d - 2, e.w, 4], [e.x + 2, e.z + e.d / 2, 4, e.d], [e.x + e.w - 2, e.z + e.d / 2, 4, e.d]])
+      g.add(part(box(w, 1, d), '#ffd23f', { outline: false, shadow: false, pos: [x, 0.7, z] }));
+    const txt = textPlane('CHẬM', 18, '#ffd23f'); txt.rotation.x = -Math.PI / 2; txt.position.set(e.x + e.w / 2, 1, e.z + e.d / 2); g.add(txt);
     return {
       obj: g,
       update(e) { s.flash.material.opacity = Math.max(0, e.flash / 30); s.flash.scale.setScalar(1 + (30 - Math.max(0, e.flash)) / 15); },
-      bubble(e) { if (e.flash > 0) return B('📸 CHỤP!', e.x, 240, ROADW + 14, 16); }
+      bubble(e) { if (e.flash > 0) return B('📸 CHỤP!', sx, 200, sz, 16); }
     };
   },
 
@@ -422,15 +371,27 @@ const V = {
       obj: m,
       update(e, w, t) {
         const shake = e.st === 1 ? Math.sin(t * 2.2) * 2 : 0;
-        m.position.set(e.x + shake, Y(e.y) - (e.kind === 'boat' ? 20 : 0), e.z);
-        m.visible = e.y < G + 400;
+        const bob = e.kind === 'boat' ? Math.sin(t * 0.08 + e.x0) * 1.5 : 0;
+        m.position.set(e.x + shake, e.top - e.sink - (e.kind === 'boat' ? 20 : 0) + bob, e.z + e.d / 2);
+        m.visible = e.sink < 200;
       }
     };
   },
 
   block(e) {
-    const m = MD.makeBarrier(e.w, e.h, e.d); m.position.set(e.x, 0, e.z + e.d / 2);
-    return { obj: m };
+    const { len, wid, rot } = along(e);
+    const g = new THREE.Group(); g.position.set(e.x + e.w / 2, 0, e.z + e.d / 2); g.rotation.y = rot;
+    if (e.car || e.top >= 80) {
+      const color = e.color ?? (e.car ? '#e63946' : '#c7ccd3');
+      const c = MD.makeCar(len, e.top, color, { truck: !e.car, taxi: color === '#2fa84f' || color === '#f4f4f4' });
+      c.g.position.x = -len / 2; c.g.scale.z = wid / 96;
+      // parked with a slight random angle, like real Saigon parking
+      c.g.rotation.y = (hash(e.x + e.z * 3) - 0.5) * 0.06;
+      g.add(c.g);
+    } else {
+      const m = MD.makeBarrier(wid, e.top, len); m.position.x = -wid / 2; g.add(m); g.rotation.y = rot + Math.PI / 2;
+    }
+    return { obj: g };
   }
 };
 

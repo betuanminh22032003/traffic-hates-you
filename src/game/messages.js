@@ -11,6 +11,7 @@ export const DEATH = {
   bus: ['Xe buýt không nhường ai. Chưa bao giờ.', 'Xe buýt số 08 ép sát lề. Đúng lịch trình.'],
   flood: ['Chết máy giữa biển nước. Dắt bộ về thôi.', 'Nước vô bô-bin. Xe đề không nổ nữa.'],
   gate: ['Đâm vào cổng công ty. Bảo vệ: "Nói rồi mà!"'],
+  truck: ['Xe tải chuyển nhà 24/7. Chuyển luôn bạn.', 'Xe tải chạy giờ cấm. Tài xế: "Anh có quen người."'],
   car: ['Ô tô lùi không nhìn gương. "Ủa, có người hả?"', 'Ô tô đỗ giữa đường còn lùi. Đẳng cấp.'],
   door: ['Mở cửa ô tô không nhìn. Kinh điển.', 'Cửa xe mở ra đúng lúc bạn chạy qua. Như có hẹn trước.'],
   fall_ac: ['Cục nóng máy lạnh rơi từ tầng 4. Nóng thật.', 'Cục nóng rơi. Chủ nhà: "Tưởng ốc vít còn chắc."'],
