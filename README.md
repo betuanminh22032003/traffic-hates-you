@@ -44,10 +44,7 @@ npm run preview    # chạy thử bản build
 
 ### GitHub Pages (tự động)
 
-Workflow `.github/workflows/deploy.yml` đã có sẵn: mỗi lần push lên `main` sẽ chạy test, build, cập nhật bản build ở thư mục gốc và đăng lên Pages. Pages để chế độ nào cũng chạy:
-
-- **Deploy from a branch** (`main` / root): Pages phục vụ bản build ở thư mục gốc.
-- **GitHub Actions**: Pages phục vụ `dist/` do workflow tải lên.
+Repo đang để Pages ở chế độ **Deploy from a branch** (`main` / root). Workflow `.github/workflows/deploy.yml` chạy mỗi lần push lên `main`: test, build rồi commit bản build vào thư mục gốc ("Update built game"); Pages tự đăng commit đó.
 
 Link game: `https://betuanminh22032003.github.io/traffic-hates-you/`.
 

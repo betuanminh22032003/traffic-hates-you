@@ -1,16 +1,14 @@
-# On every push to main: test, build, keep the built game at the repo root in sync
-# (for Pages "Deploy from a branch"), and publish dist/ to Pages (for Pages "GitHub Actions").
-name: Deploy to GitHub Pages
+# On every push to main: test, build and commit the built game to the repo root.
+# GitHub Pages ("Deploy from a branch: main / root") then publishes that commit by itself.
+name: Build game for GitHub Pages
 on:
   push:
     branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
-  pages: write
-  id-token: write
 concurrency:
-  group: pages
+  group: build-root
   cancel-in-progress: true
 jobs:
   build:
@@ -33,16 +31,3 @@ jobs:
             git commit -m "Update built game [skip ci]"
             git push
           fi
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
