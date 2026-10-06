@@ -1,4 +1,4 @@
-// Offline support. muwttuwb is replaced with a build id by vite.config.js so every release gets a fresh cache.
+// Offline support. muwtulul is replaced with a build id by vite.config.js so every release gets a fresh cache.
 const CACHE = 'thy-__BUILD__';
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './manifest.webmanifest', './icons/icon-192.png'])).then(() => self.skipWaiting()));
