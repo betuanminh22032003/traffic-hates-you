@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Traffic Hates You</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&display=swap">
 <style>
@@ -10,6 +15,8 @@ canvas{display:block;width:100%;height:100%}
 .tb{pointer-events:auto;width:74px;height:74px;border-radius:50%;background:var(--pad);border:3px solid var(--padline);color:var(--fg);font:800 26px 'Baloo 2',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none}
 .tb.on{background:rgba(255,255,255,.45)}
 </style>
+</head>
+<body>
 <canvas id="c"></canvas>
 <div id="touch">
   <div class="grp"><div class="tb" id="bl">◀</div><div class="tb" id="br">▶</div></div>
@@ -477,3 +484,5 @@ requestAnimationFrame(frame);
 window.__thy={get p(){return p},get state(){return state},keys,load:loadLevel};
 })();
 </script>
+</body>
+</html>
