@@ -324,13 +324,11 @@ export function makePlank(w = 120, kind = 'board', d = 110) {
 }
 
 export function makeBalcony() {
+  // balcony sticking out from the left-side house; things get knocked off it into the street
   const g = new THREE.Group();
-  // a balcony that illegally sticks out over the whole street
-  g.add(part(box(130, 12, 420), '#d9d2c3', { pos: [0, -6, -50] }));
-  for (let i = 0; i < 9; i++) g.add(part(cyl(1.5, 1.5, 26, 5), '#555', { pos: [-60 + i * 15, 13, 158], outline: false }));
-  for (let i = 0; i < 9; i++) g.add(part(cyl(1.5, 1.5, 26, 5), '#555', { pos: [-64, 13, -240 + i * 50], outline: false }));
-  g.add(part(box(130, 3, 3), '#555', { pos: [0, 26, 158], outline: false }));
-  g.add(part(box(3, 3, 400), '#555', { pos: [-64, 26, -42], outline: false }));
+  g.add(part(box(130, 12, 150), '#d9d2c3', { pos: [0, -6, -185] }));
+  for (let i = 0; i < 9; i++) g.add(part(cyl(1.5, 1.5, 26, 5), '#555', { pos: [-60 + i * 15, 13, -112], outline: false }));
+  g.add(part(box(130, 3, 3), '#555', { pos: [0, 26, -112], outline: false }));
   return g;
 }
 

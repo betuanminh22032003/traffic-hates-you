@@ -1,4 +1,4 @@
-// Cartoon look: 3-band toon shading + inverted-hull outlines, plus canvas-text textures.
+// Look: physically based materials (soft, stylised-realistic) with thin ink outlines, plus canvas-text textures.
 // Units everywhere in the 3D scene are logic pixels (1 unit = 1 px of the 2D prototype), Y up.
 import * as THREE from 'three';
 
@@ -6,28 +6,24 @@ export const INK = 0x2a1f1a;
 export const FONT = "'Baloo 2', system-ui, sans-serif";
 export const settings = { outline: true, shadows: true };
 
-let grad = null;
-function gradientMap() {
-  if (grad) return grad;
-  grad = new THREE.DataTexture(new Uint8Array([110, 190, 255]), 3, 1, THREE.RedFormat);
-  grad.minFilter = grad.magFilter = THREE.NearestFilter;
-  grad.needsUpdate = true;
-  return grad;
+// Standard material with sensible defaults (rough painted surfaces).
+export function std(opts = {}) {
+  return new THREE.MeshStandardMaterial({ roughness: 0.82, metalness: 0, ...opts });
 }
 
 const cache = new Map();
-// Shared toon material per color (never disposed).
+// Shared material per color (never disposed).
 export function M(color, opts) {
   const key = color + (opts ? JSON.stringify(opts) : '');
   let m = cache.get(key);
-  if (!m) { m = new THREE.MeshToonMaterial({ color, gradientMap: gradientMap(), ...opts }); cache.set(key, m); }
+  if (!m) { m = std({ color, ...opts }); cache.set(key, m); }
   return m;
 }
-export const outlineMat = new THREE.MeshBasicMaterial({ color: INK, side: THREE.BackSide });
+export const outlineMat = new THREE.MeshBasicMaterial({ color: 0x1c1512, side: THREE.BackSide });
 
 // Per-object material that owns a texture; disposed with the object.
 export function texMat(tex, opts = {}) {
-  const m = new THREE.MeshToonMaterial({ map: tex, gradientMap: gradientMap(), transparent: !!opts.transparent, ...opts });
+  const m = std({ map: tex, transparent: !!opts.transparent, ...opts });
   m.userData.own = true;
   return m;
 }
@@ -56,7 +52,7 @@ export function part(geo, color, o = {}) {
   const m = new THREE.Mesh(geo, mat);
   m.castShadow = o.shadow !== false && settings.shadows;
   m.receiveShadow = !!o.receive;
-  if (o.outline !== false && settings.outline) addOutline(m, o.t ?? 1.6);
+  if (o.outline !== false && settings.outline) addOutline(m, (o.t ?? 1.6) * 0.6);
   if (o.pos) m.position.set(...o.pos);
   if (o.rot) m.rotation.set(...o.rot);
   return m;

@@ -3,7 +3,7 @@
 // Static meshes are merged per material ("baked") so the whole street costs a few dozen draw calls.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { part, box, cyl, ico, M, canvasTex, fontPx, settings, disposeTree } from './toon.js';
+import { part, box, cyl, ico, M, std, canvasTex, fontPx, settings, disposeTree } from './toon.js';
 import { makeTree, makeParkedBike, makeElectricPole } from './models.js';
 
 export const ROAD_Z = 120, WALK_Z = 260, WIRE_Z = -228;
@@ -83,15 +83,57 @@ function textures() {
     c.fillStyle = '#5b7fa3'; for (let x = 4; x < 64; x += 16) c.fillRect(x, 6, 10, 52);
   });
   windowsTower.wrapS = windowsTower.wrapT = THREE.RepeatWrapping;
-  TEX = { facade: [facade, facade2], shutter, shop, atlas, windowsTower };
+  // grayscale detail maps, tinted by the theme colour through material.color
+  const noise = (c, w, h, n, a0, a1, sz) => { for (let i = 0; i < n; i++) { const v = Math.random(); c.fillStyle = `rgba(0,0,0,${a0 + v * (a1 - a0)})`; c.fillRect(Math.random() * w, Math.random() * h, sz * (0.5 + v), sz * (0.5 + v)); } };
+  const asphalt = canvasTex(256, 256, (c, w, h) => {
+    c.fillStyle = '#e8e8e8'; c.fillRect(0, 0, w, h);
+    noise(c, w, h, 2600, 0.04, 0.22, 2.2);
+    for (let i = 0; i < 6; i++) { c.fillStyle = `rgba(0,0,0,${0.05 + Math.random() * 0.06})`; c.beginPath(); c.ellipse(Math.random() * w, Math.random() * h, 20 + Math.random() * 40, 10 + Math.random() * 25, Math.random() * 3, 0, 7); c.fill(); }
+    c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 1.2;
+    for (let i = 0; i < 3; i++) { let x = Math.random() * w, y = Math.random() * h; c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (Math.random() - 0.5) * 30; y += (Math.random() - 0.3) * 20; c.lineTo(x, y); } c.stroke(); }
+  });
+  asphalt.wrapS = asphalt.wrapT = THREE.RepeatWrapping;
+  const tiles = canvasTex(128, 128, (c, w, h) => {
+    c.fillStyle = '#efefef'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { c.fillStyle = `rgba(0,0,0,${Math.random() * 0.08})`; c.fillRect(i * 32 + 1, j * 32 + 1, 30, 30); }
+    noise(c, w, h, 500, 0.02, 0.1, 1.5);
+    c.fillStyle = 'rgba(0,0,0,.28)'; for (let k = 0; k <= 4; k++) { c.fillRect(k * 32 - 1, 0, 2, h); c.fillRect(0, k * 32 - 1, w, 2); }
+  });
+  tiles.wrapS = tiles.wrapT = THREE.RepeatWrapping;
+  // grime on facades
+  for (const f of [facade, facade2]) {
+    const c = f.image.getContext('2d');
+    const g = c.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(60,40,20,.12)');
+    c.fillStyle = g; c.fillRect(0, 0, 128, 128); noise(c, 128, 128, 300, 0.02, 0.07, 2); f.needsUpdate = true;
+  }
+  TEX = { facade: [facade, facade2], shutter, shop, atlas, windowsTower, asphalt, tiles };
   return TEX;
 }
 
 const texMats = new Map();
 function facadeMat(tex, color) {
   const k = tex.uuid + color;
-  if (!texMats.has(k)) texMats.set(k, new THREE.MeshToonMaterial({ map: tex, color, gradientMap: M('#fff').gradientMap }));
+  if (!texMats.has(k)) texMats.set(k, std({ map: tex, color }));
   return texMats.get(k);
+}
+
+// Box whose UVs repeat every `tile` px, so long road pieces keep their texture scale when merged.
+function uvBox(w, h, d, tile = 256) {
+  const g = new THREE.BoxGeometry(w, h, d), uv = g.attributes.uv;
+  const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, uv.getX(i) * dims[f][0] / tile, uv.getY(i) * dims[f][1] / tile); }
+  return g;
+}
+const groundMats = new Map();
+export function groundMat(kind, th) {
+  const k = kind + th.road + th.walk + !!th.rain;
+  if (!groundMats.has(k)) {
+    const T = textures();
+    groundMats.set(k, kind === 'road'
+      ? std({ map: T.asphalt, color: th.road, roughness: th.rain ? 0.3 : 0.92, metalness: th.rain ? 0.25 : 0 })
+      : std({ map: T.tiles, color: th.walk, roughness: th.rain ? 0.45 : 0.9 }));
+  }
+  return groundMats.get(k);
 }
 
 // Plane facing +Z with UVs repeated (ru, rv) times.
@@ -149,7 +191,7 @@ function buildRoad(root, x0, x1, holes, th) {
     if (z < ROAD_Z) solid.push([z, ROAD_Z]);
     for (const [z0, z1] of solid) {
       const d = z1 - z0, cz = (z0 + z1) / 2;
-      root.add(part(box(w, 8, d), th.road, { pos: [cx, -4, cz], outline: false, receive: true, shadow: false }));
+      root.add(part(uvBox(w, 8, d), groundMat('road', th), { pos: [cx, -4, cz], outline: false, receive: true, shadow: false }));
       root.add(part(box(w, 70, d), '#7a5434', { pos: [cx, -43, cz], outline: false, shadow: false }));
     }
     for (const [c0, c1] of cuts) {
@@ -165,13 +207,12 @@ function buildRoad(root, x0, x1, holes, th) {
   // sidewalks + curbs on both sides
   const L = x1 - x0, cx = (x0 + x1) / 2, mid = (ROAD_Z + WALK_Z) / 2;
   for (const s of [-1, 1]) {
-    root.add(part(box(L, 14, WALK_Z - ROAD_Z), th.walk, { pos: [cx, 7, s * mid], outline: false, receive: true, shadow: false }));
+    root.add(part(uvBox(L, 14, WALK_Z - ROAD_Z, 96), groundMat('walk', th), { pos: [cx, 7, s * mid], outline: false, receive: true, shadow: false }));
     root.add(part(box(L, 300, WALK_Z - ROAD_Z), '#5a4a3a', { pos: [cx, -150, s * mid], outline: false, shadow: false }));
     root.add(part(box(L, 16, 6), '#9a9590', { pos: [cx, 8, s * (ROAD_Z + 3)], outline: false, shadow: false }));
-    for (let x = Math.ceil(x0 / 48) * 48; x < x1; x += 48) root.add(part(box(1.5, 1, WALK_Z - ROAD_Z - 8), 'rgb(150,130,105)', { pos: [x, 14.2, s * mid], outline: false, shadow: false }));
   }
   // the street keeps going beyond the level so the horizon isn't empty
-  root.add(part(box(3000, 8, WALK_Z * 2), th.road, { pos: [x1 + 1500, -4, 0], outline: false, shadow: false }));
+  root.add(part(uvBox(3000, 8, WALK_Z * 2), groundMat('road', th), { pos: [x1 + 1500, -4, 0], outline: false, shadow: false }));
 }
 
 // One row of tube houses. side -1 = left of the street (fronts face +z), +1 = right (fronts face -z).
@@ -216,7 +257,7 @@ function buildHouses(root, x0, x1, th, seed, side) {
 let _shopMat, _shutMat, _atlasMat, _pitMat;
 const pitMat = () => (_pitMat ??= new THREE.MeshBasicMaterial({ color: '#140e0a' }));
 const shopMat = () => (_shopMat ??= new THREE.MeshBasicMaterial({ map: textures().shop }));
-const shutterMat = () => (_shutMat ??= new THREE.MeshToonMaterial({ map: textures().shutter, gradientMap: M('#fff').gradientMap }));
+const shutterMat = () => (_shutMat ??= std({ map: textures().shutter }));
 const atlasMat = () => (_atlasMat ??= new THREE.MeshBasicMaterial({ map: textures().atlas }));
 
 function buildBackdrop(root, x0, x1, th, seed) {

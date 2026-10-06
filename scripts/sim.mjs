@@ -62,7 +62,7 @@ export function run(level, script, { maxT = 7000, trace = false } = {}) {
   const bot = makeBot(script), p = w.p;
   while (w.status === 'play' && w.t < maxT) {
     step(w, bot(w), 1, ev);
-    if (trace && (w.t % (+process.env.EVERY || 10) === 0)) log.push(`${w.t} x=${p.x.toFixed(1)} y=${p.y.toFixed(1)} vx=${p.vx.toFixed(2)}` + (process.env.WATCH ? ' ' + w.ents.filter(e => e.k === process.env.WATCH).map(e => JSON.stringify(e)).join(' ') : ''));
+    if (trace && (w.t % (+process.env.EVERY || 10) === 0)) log.push(`${w.t} x=${p.x.toFixed(1)} z=${p.z.toFixed(1)} y=${p.y.toFixed(1)} vx=${p.vx.toFixed(2)}` + (process.env.WATCH ? ' ' + w.ents.filter(e => e.k === process.env.WATCH).map(e => JSON.stringify(e)).join(' ') : ''));
   }
   return { status: w.status, cause: w.cause, t: w.t, x: p.x, log, w };
 }

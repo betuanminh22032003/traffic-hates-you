@@ -6,6 +6,7 @@ import { settings, disposeTree, fontPx } from './toon.js';
 import { makeRider } from './models.js';
 import { buildWorld, THEMES } from './world.js';
 import { makeEntityView } from './entities.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const Y = y => G - y;
 // Chase camera: behind and above the rider, looking down the street (Trees-Hate-You style 3/4 view).
@@ -18,7 +19,14 @@ export class View {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
     this.scene = new THREE.Scene();
+    // soft image-based light so PBR materials don't look flat
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.45;
+    pmrem.dispose();
     this.camera = new THREE.PerspectiveCamera(50, 16 / 9, 10, 9000);
     this.hemi = new THREE.HemisphereLight('#fff', '#666', 1.2);
     this.sun = new THREE.DirectionalLight('#fff', 2.5);
@@ -87,7 +95,11 @@ export class View {
     const ctx = { th: this.th, touch: this.touch };
     for (const e of world.ents) {
       const v = makeEntityView(e, ctx);
-      if (v) { this.views.push(v); if (v.obj) this.dyn.add(v.obj); if (this.attractMode && e.k === 'txt') v.obj.visible = false; }
+      if (v) {
+        this.views.push(v); if (v.obj) this.dyn.add(v.obj);
+        if (this.attractMode && e.k === 'txt') v.obj.visible = false;
+        if (v.overhead) v.fade = { a: 1, mats: fadeable(v.overhead) };
+      }
     }
     const r = makeRider({ body: '#e63946', helmet: '#ffd23f', jacket: '#4d7cfe', pants: '#2b2d42', mask: true });
     const root = new THREE.Group(), tumble = new THREE.Group();
@@ -152,9 +164,15 @@ export class View {
     for (const v of this.views) {
       v.update?.(v.e, w, t, dt);
       if (v.billboard) { v.obj.quaternion.copy(this.camera.quaternion); v.obj.visible = v.e.x > px - 60; }
+      if (v.fade) {
+        // overhead structures (balconies, arches, gate frames) go see-through while they are between camera and rider
+        const between = v.e.x > this.camera.position.x - 80 && v.e.x < px + 240;
+        const a = v.fade.a += ((between ? 0.18 : 1) - v.fade.a) * Math.min(1, 0.15 * (dt || 1));
+        for (const m of v.fade.mats) { m.opacity = a; m.transparent = a < 0.99; m.depthWrite = a > 0.6; }
+      }
       if (v.sparks && v.e.st === 1 && v.e.wob <= 0 && Math.random() < 0.5) {
         const e = v.e, k = 0.8;
-        this.particles.burst(e.x, Math.cos(e.a) * e.len * k, e.zb - e.side * Math.sin(e.a) * e.len * k, 1, '#ffe14d', 3, 4, 0.2);
+        this.particles.burst(e.x + e.dx * Math.sin(e.a) * e.len * k, Math.cos(e.a) * e.len * k, e.zb + e.dz * Math.sin(e.a) * e.len * k, 1, '#ffe14d', 3, 4, 0.2);
       }
       const sp = v.spray?.(v.e);
       if (sp && w.ents.some(f => f.k === 'flood' && sp[0] > f.x0 && sp[0] < f.x1) && Math.random() < 0.6) this.particles.burst(sp[0], 20, sp[1], 1, '#bfe6ff', 4, 5, 0.35);
@@ -230,6 +248,17 @@ export class View {
   }
 
   uiScale() { return Math.max(0.7, Math.min(1.5, Math.min(this.H, this.W) / 600)); }
+}
+
+// Give a subtree its own transparent-capable materials; returns them for fading.
+function fadeable(objs) {
+  const mats = [];
+  for (const o of objs) o.traverse((m) => {
+    if (!m.isMesh) return;
+    const conv = mat => { const c = mat.clone(); c.userData.own = true; mats.push(c); return c; };
+    m.material = Array.isArray(m.material) ? m.material.map(conv) : conv(m.material);
+  });
+  return mats;
 }
 
 /* ---------- drawing helpers for the overlay ---------- */

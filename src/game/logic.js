@@ -59,11 +59,13 @@ export const KINDS = {
     }
   },
 
-  // Electric pole or tree standing at a curb (side -1 = left, +1 = right) that falls ACROSS the street.
+  // Electric pole or tree standing at a curb (side -1 = left, +1 = right) that falls into the street.
+  // ang tilts the fall: 0 = straight across, negative = diagonally toward you, positive = away from you.
   pole: {
     init(e) {
       e.a = 0; e.av = 0; e.st = 0; e.len ??= 240; e.acc ??= 0.004; e.wob ??= 10; e.kind ??= 'pole';
-      e.side ??= -1; e.zb = e.side * (ROADW + 14);
+      e.side ??= -1; e.ang ??= 0; e.zb = e.side * (ROADW + 14);
+      e.dx = Math.sin(e.ang); e.dz = -e.side * Math.cos(e.ang);
     },
     update(w, e, dt, ev) {
       const p = w.p;
@@ -71,21 +73,25 @@ export const KINDS = {
       if (e.st !== 1) return;
       e.wob -= dt; if (e.wob > 0) return;
       e.av += e.acc * dt; e.a += e.av * dt;
-      if (w.status === 'play' && Math.abs(p.x - e.x) < PR + (e.kind === 'tree' ? 14 : 8)) {
+      if (w.status === 'play') {
         const top = G - p.y + PH, bot = G - p.y; // player height range above the road
         for (let i = 0.08; i <= 1; i += 0.03) {
-          const qz = e.zb - e.side * Math.sin(e.a) * e.len * i, qh = Math.cos(e.a) * e.len * i;
-          const r = e.kind === 'tree' && i > 0.7 ? 40 : 6;
-          if (Math.abs(qz - p.z) < PR + r && qh < top && qh > bot - r) { die(w, e.kind, ev); break; }
+          const r = e.kind === 'tree' && i > 0.7 ? 40 : 8;
+          const q = Math.sin(e.a) * e.len * i, qh = Math.cos(e.a) * e.len * i;
+          const qx = e.x + e.dx * q, qz = e.zb + e.dz * q;
+          if (Math.abs(qx - p.x) < PR + r && Math.abs(qz - p.z) < PR + r && qh < top && qh > bot - r) { die(w, e.kind, ev); break; }
         }
       }
-      if (e.a >= Math.PI / 2) { e.a = Math.PI / 2; e.st = 2; ev('thud', { x: e.x, z: e.zb - e.side * e.len * 0.5, big: true }); }
+      if (e.a >= Math.PI / 2) { e.a = Math.PI / 2; e.st = 2; ev('thud', { x: e.x + e.dx * e.len * 0.5, z: e.zb + e.dz * e.len * 0.5, big: true }); }
     },
     solids(e) {
       if (e.st !== 2) return [];
-      const L = e.len * (e.kind === 'tree' ? 0.72 : 1), h = e.kind === 'tree' ? 26 : 16;
-      const z0 = e.side < 0 ? e.zb : e.zb - L;
-      return [{ x: e.x - 12, w: 24, y: G - h, h, z: z0, d: L }];
+      const L = e.len * (e.kind === 'tree' ? 0.72 : 1), h = e.kind === 'tree' ? 26 : 16, n = Math.ceil(L / 22), out = [];
+      for (let k = 0; k < n; k++) {
+        const q = (k + 0.5) * L / n, cx = e.x + e.dx * q, cz = e.zb + e.dz * q;
+        out.push({ x: cx - 14, w: 28, y: G - h, h, z: cz - 14, d: 28 });
+      }
+      return out;
     }
   },
 
@@ -102,7 +108,7 @@ export const KINDS = {
 
   // Unleashed dog: sleeps, wakes up, runs at you and steers toward your lane.
   dog: {
-    init(e) { e.on = false; e.t = 0; e.speed ??= 5.6; e.z ??= 0; e.turn ??= 0.9; },
+    init(e) { e.on = false; e.t = 0; e.speed ??= 6.2; e.z ??= 0; e.turn ??= 1.3; },
     update(w, e, dt, ev) {
       if (!e.on) { if (w.p.x > e.trig) { e.on = true; ev('bark'); } return; }
       e.t += dt;
@@ -117,13 +123,15 @@ export const KINDS = {
   // Wrong-way motorbike (dir -1, comes at you) or a "ninja lead" overtaking from behind (dir +1).
   // It locks onto your lane when it spawns.
   onc: {
-    init(e) { e.on = false; e.x = 0; e.z = 0; e.t = 0; e.dir ??= -1; e.speed ??= e.dir > 0 ? 12 : 8; },
+    init(e) { e.on = false; e.x = 0; e.z = 0; e.t = 0; e.dir ??= -1; e.speed ??= e.dir > 0 ? 12 : 8; e.track ??= 0.7; },
     update(w, e, dt, ev) {
       if (!e.on) {
         if (w.p.x > e.trig) { e.on = true; e.x = w.p.x + (e.dir < 0 ? 900 : -520); e.z = e.lane ?? w.p.z; ev('honk', { behind: e.dir > 0 }); }
         return;
       }
       e.t += dt; e.x += e.dir * e.speed * dt;
+      // keeps steering at you until it is level with you
+      if (e.dir * (w.p.x - e.x) > 40) e.z = clamp(e.z + clamp(w.p.z - e.z, -e.track * dt, e.track * dt), -ZMAX, ZMAX);
       if (overlap(pbox(w.p), { x: e.x - 30, y: G - 54, w: 60, h: 54, z: e.z - 14, d: 28 })) die(w, e.dir > 0 ? 'ninja' : 'onc', ev);
     }
   },
@@ -187,7 +195,7 @@ export const KINDS = {
   car: {
     init(e) {
       e.w ??= 150; e.h ??= 58; e.vx = 0; e.on = false; e.lane ??= 'road'; e.door = 0; e.x0 = e.x; e.range ??= 400;
-      e.D = e.truck ? 104 : 96; e.z ??= e.lane === 'curb' ? -ROADW + 46 : 0;
+      e.D = e.truck ? 104 : 96; e.side ??= -1; e.z ??= e.lane === 'curb' ? e.side * (ROADW - 46) : 0;
     },
     update(w, e, dt, ev) {
       const p = w.p;
@@ -203,11 +211,11 @@ export const KINDS = {
       } else if (e.doorTrig != null) {
         if (p.x > e.doorTrig && e.door === 0) ev('door');
         if (p.x > e.doorTrig) e.door = Math.min(1, e.door + 0.14 * dt);
-        const z0 = e.z + e.D / 2;
-        if (e.door > 0.3 && overlap(pbox(p), { x: e.x + e.w * 0.62, y: G - 52, w: 40, h: 52, z: z0, d: 44 * e.door })) die(w, 'door', ev);
+        const dd = 44 * e.door, z0 = e.side < 0 ? e.z + e.D / 2 : e.z - e.D / 2 - dd;
+        if (e.door > 0.3 && overlap(pbox(p), { x: e.x + e.w * 0.62, y: G - 52, w: 40, h: 52, z: z0, d: dd })) die(w, 'door', ev);
       }
     },
-    solids(e) { return e.lane === 'road' ? [{ x: e.x, y: G - e.h, w: e.w, h: e.h, z: e.z - e.D / 2, d: e.D, vx: e.vx }] : []; }
+    solids(e) { return [{ x: e.x, y: G - e.h, w: e.w, h: e.h, z: e.z - e.D / 2, d: e.D, vx: e.vx }]; }
   },
 
   // Something drops from above (balcony / crane) right on the lane you are in when it triggers.
@@ -225,13 +233,13 @@ export const KINDS = {
 
   // Old lady crossing the street (z from left curb to right curb). Her slipper reaches far: keep your distance.
   walker: {
-    init(e) { e.z = -ROADW - 40; e.st = 0; e.zs ??= 1.8; e.pauseT = e.pause ?? 0; e.hit = false; e.reach ??= 46; },
+    init(e) { e.st = 0; e.from ??= -1; e.z = e.from * (ROADW + 40); e.zs = -e.from * (e.zs ?? 1.8); e.pauseT = e.pause ?? 0; e.hit = false; e.reach ??= 46; },
     update(w, e, dt, ev) {
       if (e.st === 0 && w.p.x > e.trig) { e.st = 1; ev('hey'); }
       if (e.st === 1) {
         if (Math.abs(e.z) < 4 && e.pauseT > 0) e.pauseT -= dt;
         else e.z += e.zs * dt;
-        if (e.z > ROADW + 40) e.st = 2;
+        if (Math.abs(e.z) > ROADW + 40 && Math.sign(e.z) === Math.sign(e.zs)) e.st = 2;
       }
       const p = w.p;
       if (w.status === 'play' && Math.abs(e.z) < ROADW + 10 && Math.abs(p.x - e.x) < e.reach && Math.abs(p.z - e.z) < e.reach) { e.hit = true; ev('slap'); die(w, 'granny', ev); }

@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { G, ROADW } from '../game/logic.js';
 import { part, box, cyl, M, textPlane, canvasTex, texMat, signTex } from './toon.js';
 import * as MD from './models.js';
+import { groundMat } from './world.js';
 
 const Y = y => G - y;
 const B = (s, x, y, z = 0, size = 15) => ({ s, x, y, z, size });
@@ -44,7 +45,7 @@ const V = {
     let cover = null;
     if (e.hidden) {
       cover = new THREE.Group();
-      cover.add(part(box(e.w, 8, D), ctx.th.road, { outline: false, receive: true, pos: [0, -4, 0] }));
+      cover.add(part(box(e.w, 8, D), groundMat('road', ctx.th), { outline: false, receive: true, pos: [0, -4, 0] }));
       const crack = new THREE.Mesh(new THREE.PlaneGeometry(e.w, D * 0.7), own(new THREE.MeshBasicMaterial({ map: cracks(), transparent: true, depthWrite: false })));
       crack.rotation.x = -Math.PI / 2; crack.position.y = 0.4; cover.add(crack);
       if (e.puddle) {
@@ -93,11 +94,12 @@ const V = {
     const g = new THREE.Group();
     g.add(e.kind === 'tree' ? MD.makeTree(e.len) : MD.makeElectricPole(e.len));
     g.position.set(e.x, 0, e.zb);
+    const axis = new THREE.Vector3(e.dz, 0, -e.dx).normalize();
     return {
       obj: g,
       update(e, w, t) {
-        const wob = e.st === 1 && e.wob > 0 ? Math.sin(t * 1.6) * 0.05 : 0;
-        g.rotation.x = -e.side * (e.a + wob);
+        const wob = e.st === 1 && e.wob > 0 ? Math.sin(t * 1.6) * 0.06 : 0;
+        g.quaternion.setFromAxisAngle(axis, e.a + wob);
       },
       sparks: e.kind !== 'tree'
     };
@@ -111,7 +113,7 @@ const V = {
     g.add(lid);
     const holeDisk = new THREE.Mesh(new THREE.CircleGeometry(24, 20), own(new THREE.MeshBasicMaterial({ color: '#1a1410' })));
     holeDisk.rotation.x = -Math.PI / 2; holeDisk.position.y = 0.5; holeDisk.visible = false; g.add(holeDisk);
-    const water = new THREE.Mesh(cyl(10, 16, 1, 16), own(new THREE.MeshToonMaterial({ color: '#78c8ff', transparent: true, opacity: 0.85 })));
+    const water = new THREE.Mesh(cyl(10, 16, 1, 16), own(new THREE.MeshStandardMaterial({ color: '#78c8ff', transparent: true, opacity: 0.85, roughness: 0.1 })));
     water.visible = false; g.add(water);
     return {
       obj: g,
@@ -191,7 +193,7 @@ const V = {
     const w = e.x1 - e.x0, D = 560, segs = Math.max(8, Math.ceil(w / 20));
     const geo = new THREE.BoxGeometry(w, 34, D, segs, 1, 1);
     const pos = geo.attributes.position, base = Float32Array.from(pos.array);
-    const water = new THREE.Mesh(geo, own(new THREE.MeshToonMaterial({ color: '#4696c8', transparent: true, opacity: 0.74 })));
+    const water = new THREE.Mesh(geo, own(new THREE.MeshStandardMaterial({ color: '#3f7fa8', transparent: true, opacity: 0.8, roughness: 0.08, metalness: 0.1 })));
     water.position.set((e.x0 + e.x1) / 2, 30 - 17, 0); water.renderOrder = 2;
     const g = new THREE.Group(); g.add(water);
     const slipper = part(new THREE.CapsuleGeometry(5, 14, 3, 8), '#ff6fae', { rot: [0, 0, Math.PI / 2] });
@@ -225,8 +227,9 @@ const V = {
     sign.position.set(e.x + 65, 340, -ROADW - 126); g.add(sign);
     g.add(part(box(404, 40, 8), '#e63946', { pos: [e.x + 65, 340, -ROADW - 131] }));
     // gate frame over the street
-    for (const z of [-ROADW - 6, ROADW + 6]) g.add(part(box(24, 120, 24), '#c0c4ca', { pos: [e.x, 60, z] }));
-    g.add(part(box(20, 20, ROADW * 2 + 36), '#c0c4ca', { pos: [e.x, 128, 0] }));
+    const frame = new THREE.Group(); g.add(frame);
+    for (const z of [-ROADW - 6, ROADW + 6]) frame.add(part(box(24, 120, 24), '#c0c4ca', { pos: [e.x, 60, z] }));
+    frame.add(part(box(20, 20, ROADW * 2 + 36), '#c0c4ca', { pos: [e.x, 128, 0] }));
     const barGeo = box(18, 74, ROADW * 2); barGeo.translate(0, 37, 0);
     const bar = part(barGeo, '#c0c4ca'); bar.position.set(e.x, 0, 0); bar.scale.y = 0.001; g.add(bar);
     for (const y of [20, 50]) { const st = part(box(19, 8, ROADW * 2 + 1), '#e63946', { outline: false }); st.position.y = y; bar.add(st); }
@@ -234,7 +237,8 @@ const V = {
     return {
       obj: g,
       update(e) { bar.scale.y = Math.max(0.001, e.a); bar.visible = e.a > 0.01; },
-      bubble(e) { if (e.st) return B('HẾT CHỖ! Ra bãi sau!', e.x + 50, 112, ROADW + 30, 15); }
+      bubble(e) { if (e.st) return B('HẾT CHỖ! Ra bãi sau!', e.x + 50, 112, ROADW + 30, 15); },
+      overhead: [frame]
     };
   },
 
@@ -242,6 +246,7 @@ const V = {
     const g = new THREE.Group();
     const a = MD.makeArch(e.label); g.add(a.g);
     const line = finishLine(); g.add(line);
+    const overhead = [a.g];
     const legs = a.posts.map(p => { const l = new THREE.Group(); l.add(part(new THREE.CapsuleGeometry(4, 26, 3, 6), '#8d6e63', { pos: [0, -14, 0] })); l.position.y = 24; l.visible = false; p.add(l); return l; });
     return {
       obj: g,
@@ -255,7 +260,8 @@ const V = {
         const moving = e.tx !== null && e.x < e.tx;
         if (moving) return B('hehe 😜', e.x, 220, 0, 15);
         if (e.ran) return B('ok ok, vào đi', e.x, 220, 0, 14);
-      }
+      },
+      overhead
     };
   },
 
@@ -266,6 +272,7 @@ const V = {
     let shown = false;
     return {
       obj: g,
+      overhead: [a.g],
       update(e) { if (e.flipped && !shown) { shown = true; a.setLabel(e.flip); line.visible = false; } },
       bubble(e) { if (e.flipped) return B('Đích thật ở phía trước nha 😜', e.x, 225, 0, 14); }
     };
@@ -278,7 +285,7 @@ const V = {
     g.add(c.g);
     let door = null;
     if (e.lane === 'curb') {
-      door = new THREE.Group(); door.position.set(e.x + e.w * 0.62 + 40, 0, e.z + e.D / 2 + 1.5); g.add(door);
+      door = new THREE.Group(); door.position.set(e.x + e.w * 0.62 + 40, 0, e.z - e.side * (e.D / 2 + 1.5)); g.add(door);
       door.add(part(box(40, 26, 3), e.color ?? '#e63946', { pos: [-20, 30, 0] }));
       door.add(part(box(24, 12, 1), '#2b4a6b', { pos: [-20, 48, 0], outline: false }));
     }
@@ -286,7 +293,7 @@ const V = {
       obj: g,
       update(e) {
         if (e.lane === 'road') { c.g.position.x = e.x; for (const wh of c.wheels) wh.rotation.z = -(e.x - e.x0) / 13; }
-        if (door) door.rotation.y = e.door * 1.25;
+        if (door) door.rotation.y = -e.side * e.door * 1.25;
       },
       bubble(e) {
         if (e.lane === 'road' && e.on && Math.abs(e.vx) > 0.2) return B('Lùi nè! Bíp bíp!', e.x + e.w / 2, e.h + 30, e.z, 14);
@@ -300,28 +307,31 @@ const V = {
     const obj = e.kind === 'pot' ? MD.makePot() : e.kind === 'beam' ? MD.makeBeam(e.w) : MD.makeAC();
     g.add(obj);
     const startBottom = Y(e.y + e.h);
-    let rope = null, zv = e.z;
+    const overhead = [];
+    const perch = e.kind === 'beam' ? 0 : -150; // sits on the balcony until it gets knocked off
+    let rope = null, zv = e.kind === 'beam' ? e.z : perch;
     if (e.kind === 'beam') {
       rope = new THREE.Group();
       rope.add(part(cyl(1.5, 1.5, 1200, 6), '#333', { outline: false, pos: [0, 624, 0] }));
       rope.add(part(new THREE.TorusGeometry(8, 2, 6, 12, Math.PI * 1.4), '#777', { pos: [0, 32, 0] }));
       rope.position.set(e.x, startBottom, e.z); g.add(rope);
     } else {
-      const bal = MD.makeBalcony(); bal.position.set(e.x, startBottom, 0); g.add(bal);
+      const bal = MD.makeBalcony(); bal.position.set(e.x, startBottom, 0); g.add(bal); overhead.push(bal);
     }
     const blob = new THREE.Mesh(new THREE.CircleGeometry(1, 20), own(new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0, depthWrite: false })));
     blob.rotation.x = -Math.PI / 2; blob.position.set(e.x, 0.9, 0); g.add(blob);
     return {
       obj: g,
       update(e, w, t, dt) {
-        zv += (e.z - zv) * Math.min(1, 0.35 * (dt || 1));
+        zv += ((e.st === 0 && e.kind !== 'beam' ? perch : e.z) - zv) * Math.min(1, 0.12 * (dt || 1));
         obj.position.set(e.x, Y(e.y + e.h), zv);
         if (rope) rope.position.z = zv;
         obj.rotation.z = e.st === 1 ? Math.sin(e.y * 0.05) * 0.15 : 0;
         const k = e.st === 1 ? Math.min(1, (e.y - (G - 330)) / 280) : 0;
         blob.material.opacity = k * 0.45; blob.scale.setScalar(e.w * 0.6 * (0.4 + k)); blob.position.z = zv;
       },
-      bubble(e) { if (e.st === 1) return B('ỐI ỐI!', e.x + 30, 300, zv, 15); }
+      bubble(e) { if (e.st === 1) return B('ỐI ỐI!', e.x + 30, 300, zv, 15); },
+      overhead
     };
   },
 
@@ -334,7 +344,7 @@ const V = {
         const walking = e.st === 1 && !(Math.abs(e.z) < 4 && e.pauseT > 0);
         gr.legs.forEach((l, i) => { l.rotation.z = walking ? Math.sin(t * 0.25 + i * Math.PI) * 0.5 : 0; });
         gr.arm.rotation.z = e.hit ? Math.sin(t * 0.9) * 1.6 + 1.6 : 0;
-        gr.g.rotation.y = e.hit ? Math.PI : -Math.PI / 2;
+        gr.g.rotation.y = e.hit ? Math.PI : -Math.sign(e.zs) * Math.PI / 2;
       },
       bubble(e) {
         if (e.hit) return B('MẤT DẠY!', e.x, 120, e.z, 16);
