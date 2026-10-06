@@ -166,7 +166,7 @@ const V = {
         r.g.position.set(e.x, 0, e.z);
         r.spin(e.t * 0.6); r.lean(0.12);
       },
-      bubble(e) { if (e.on && e.t < 90) return B(ninja ? 'BÍÍP! TRÁNH!' : 'TRÁNH RA!', e.x, 100, e.z, 15); },
+      bubble(e, w) { if (e.on && e.t < 90 && (ninja || e.x > w.p.x + 40)) return B(ninja ? 'BÍÍP! TRÁNH!' : 'TRÁNH RA!', e.x, 100, e.z, 15); },
       behind(e) { return e.on && ninja ? e.x : null; }
     };
   },
