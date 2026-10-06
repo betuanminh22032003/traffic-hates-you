@@ -24,8 +24,9 @@ function cracks() {
 }
 
 const V = {
-  txt(e) {
-    const m = textPlane(e.s, e.size, e.color);
+  txt(e, ctx) {
+    const s = e.s === '@controls' ? (ctx.touch ? '▶ chạy    ◀ phanh    ⤒ nhảy' : '→ chạy    ← phanh    SPACE nhảy') : e.s;
+    const m = textPlane(s, e.size, e.color);
     m.position.set(e.x, Y(e.y), -105);
     return { obj: m };
   },
@@ -368,18 +369,21 @@ const V = {
   },
 
   banner(e) {
-    const g = new THREE.Group();
-    for (const z of [-ROAD_Z - 8, ROAD_Z + 8]) g.add(part(cyl(3, 3, 260, 8), '#8d6e63', { pos: [e.x, 130, z] }));
-    const tex = signTex('NHIỆT LIỆT CHÀO MỪNG', { w: 1024, h: 128, bg: '#e63946', fg: '#ffd23f', size: 76, border: false });
-    const cloth = new THREE.Mesh(box(5, e.h, ROAD_Z * 2 + 12), [texMat(tex), texMat(tex), M('#e63946'), M('#e63946'), M('#e63946'), M('#e63946')]);
+    const g = new THREE.Group(), W = e.hw * 2;
+    const tex = signTex('NHIỆT LIỆT CHÀO MỪNG', { w: 512, h: 128, bg: '#e63946', fg: '#ffd23f', size: 60, border: false });
+    const cloth = new THREE.Group();
+    cloth.add(part(box(W, e.h, 3), '#e63946'));
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(W - 4, e.h - 4), texMat(tex)); face.position.z = 1.8; cloth.add(face);
     g.add(cloth);
-    const ropes = part(box(1.5, 1.5, ROAD_Z * 2 + 16), '#333', { outline: false }); g.add(ropes);
+    // ropes up to the wire bundle
+    const ropes = [];
+    for (const dx of [-W / 2 + 4, W / 2 - 4]) { const r = part(cyl(0.9, 0.9, 1, 4), '#333', { outline: false }); g.add(r); ropes.push([r, dx]); }
     return {
       obj: g,
       update(e, w, t) {
-        const top = Y(e.cur);
-        cloth.position.set(e.x, top - e.h / 2, 0); cloth.rotation.z = Math.sin(t * 0.05) * 0.04;
-        ropes.position.set(e.x, top + 2, 0);
+        const top = Y(e.cur), z = -12;
+        cloth.position.set(e.x, top - e.h / 2, z); cloth.rotation.z = Math.sin(t * 0.05) * 0.03;
+        for (const [r, dx] of ropes) { const len = 320 - top; r.scale.y = Math.max(1, len); r.position.set(e.x + dx, top + len / 2, z); }
       }
     };
   },

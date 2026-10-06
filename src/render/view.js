@@ -1,8 +1,8 @@
 // Renderer: owns the three.js scene, camera rig, player model, particles and the 2D overlay
 // (speech bubbles, off-screen warnings). Reads logic state, never mutates it.
 import * as THREE from 'three';
-import { G, PH } from '../game/logic.js';
-import { settings, disposeTree, INK, FONT, fontPx } from './toon.js';
+import { G } from '../game/logic.js';
+import { settings, disposeTree, fontPx } from './toon.js';
 import { makeRider } from './models.js';
 import { buildWorld, THEMES } from './world.js';
 import { makeEntityView } from './entities.js';
@@ -31,6 +31,7 @@ export class View {
     this.world = null; this.worldKey = null; this.views = [];
     this.particles = new Particles(this.scene);
     this.quality = 'high';
+    this.padY = 0; // lower the framing so on-screen touch buttons don't cover the road
     this.resize();
     addEventListener('resize', () => this.resize());
   }
@@ -79,8 +80,8 @@ export class View {
   reset(world) {
     for (const v of this.views) { this.dyn.remove(v.obj); disposeTree(v.obj); }
     this.views = [];
-    if (this.player) { this.dyn.remove(this.player.root); disposeTree(this.player.root); }
-    const ctx = { th: this.th };
+    if (this.player) { this.dyn.remove(this.player.root, this.player.blob); disposeTree(this.player.root); disposeTree(this.player.blob); }
+    const ctx = { th: this.th, touch: this.touch };
     for (const e of world.ents) {
       const v = makeEntityView(e, ctx);
       if (v) { this.views.push(v); if (v.obj) this.dyn.add(v.obj); if (this.attractMode && e.k === 'txt') v.obj.visible = false; }
@@ -88,8 +89,11 @@ export class View {
     const r = makeRider({ body: '#e63946', helmet: '#ffd23f', jacket: '#4d7cfe', pants: '#2b2d42', mask: true });
     const root = new THREE.Group(), tumble = new THREE.Group();
     tumble.add(r.g); root.add(tumble);
-    this.player = { r, root, tumble };
-    this.dyn.add(root);
+    // blob shadow, used when real shadows are off
+    const blob = new THREE.Mesh(new THREE.CircleGeometry(30, 20), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.3, depthWrite: false }));
+    blob.rotation.x = -Math.PI / 2; blob.material.userData.own = true; blob.visible = false;
+    this.player = { r, root, tumble, blob };
+    this.dyn.add(root, blob);
     this.particles.clear();
     this.prev = { x: world.p.x, y: world.p.y };
     this.camX = world.p.x + this.visW * 0.15; this.camY = 200;
@@ -122,6 +126,9 @@ export class View {
     pl.root.position.set(px, Y(py), 0);
     pl.r.spin(p.wheel);
     pl.r.lean(w.status === 'play' ? (inp.right ? 0.12 : inp.left ? -0.12 : 0) : 0);
+    const overHole = py > G + 1 || w.ents.some(e => e.k === 'hole' && e.open && px > e.x + 6 && px < e.x + e.w - 6);
+    pl.blob.visible = !settings.shadows && !overHole && w.status !== 'dead';
+    if (pl.blob.visible) { const gy = p.onPlat ? Y(py) : 0, h = Math.max(0, Y(py) - gy); pl.blob.position.set(px, gy + 0.8, 0); pl.blob.scale.setScalar(Math.max(0.4, 1 - h / 250)); pl.blob.scale.y *= 0.5; }
     if (w.status === 'dead') { pl.tumble.position.y = 30; pl.r.g.position.y = -30; pl.tumble.rotation.z = -p.spin; }
     else { pl.tumble.position.y = 0; pl.r.g.position.y = 0; pl.tumble.rotation.z = p.onGround ? 0 : -Math.max(-0.3, Math.min(0.25, p.vy * 0.022)); }
     // ambient particles
@@ -158,8 +165,8 @@ export class View {
   place(t) {
     const sx = (Math.random() - 0.5) * this.shake, sy = (Math.random() - 0.5) * this.shake;
     const cam = this.camera;
-    cam.position.set(this.camX + sx, this.camY + 70 + sy, this.dist);
-    cam.lookAt(this.camX + sx * 0.5, this.camY - 10, 0);
+    cam.position.set(this.camX + sx, this.camY + 70 + sy - this.padY, this.dist);
+    cam.lookAt(this.camX + sx * 0.5, this.camY - 10 - this.padY, 0);
     this.sun.position.set(this.camX - 350, 950, 650);
     this.sun.target.position.set(this.camX, 0, -60);
     this.world?.update(t, cam);
@@ -171,6 +178,7 @@ export class View {
     this.camY = 200;
     for (const v of this.views) v.update?.(v.e, w, t, dt);
     this.player.root.position.set(this.camX - this.visW * 0.15, 0, 0);
+    this.player.blob.visible = false;
     this.player.r.spin(t * 0.4);
     this.particles.update(dt);
     this.place(t);

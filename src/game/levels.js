@@ -35,7 +35,7 @@ export const CHAPTERS = [
 export const LEVELS = [
   /* ---------- Chương 1: Hẻm Nhỏ ---------- */
   { id: 1, ch: 0, name: 'Hẻm 42', len: 1800, build: () => [
-    txt(330, 230, '→ chạy    ← phanh    SPACE nhảy', { size: 24 }),
+    txt(330, 230, '@controls', { size: 24 }),
     txt(330, 190, 'Đi làm đúng giờ thôi mà. Dễ!', { size: 18, color: '#ffe066' }),
     txt(640, 150, 'Ổ gà kìa. Nhảy qua đi!', { size: 18 }),
     hole(600, 90, { sign: true }),
@@ -106,8 +106,8 @@ export const LEVELS = [
     car(1100, { lane: 'curb', doorTrig: 1070, color: '#f4f4f4' }),
     car(1650, { drive: 1460, dspeed: -3.5, range: 320, color: '#2fa84f' }),
     hole(2000, 80, { sign: true }),
-    txt(2160, 230, 'Băng rôn treo hơi thấp', { size: 16 }),
-    banner(2160),
+    txt(2230, 240, 'Băng rôn treo hơi thấp', { size: 16 }),
+    banner(2230),
     finish(2700, 'TRUNG TÂM')
   ] },
 
@@ -194,7 +194,7 @@ export const LEVELS = [
     fall(1900, 1720, 'ac'),
     tree(2350, -1, 2050),
     manhole(2650),
-    banner(2760),
+    banner(2830),
     gate(3150, 2980),
     sign(3480, 'CÔNG TY', { flip: 'ĐÙA THÔI 😜', trig: 3360 }),
     hole(3440, 100, { hidden: true, trig: 3380 }),

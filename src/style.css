@@ -48,15 +48,17 @@ h2, .logo div, .head, .chap-no, .chap-name, .end-time, .pill, .btn {
   padding: 0 calc(16px + var(--safe-r)) calc(16px + var(--safe-b)) calc(16px + var(--safe-l)); pointer-events: none; }
 #touch .grp { display: flex; gap: 14px; }
 .tb { pointer-events: auto; width: clamp(64px, 11vw, 92px); height: clamp(64px, 11vw, 92px); border-radius: 50%;
-  background: rgba(255,255,255,.2); border: 3px solid rgba(255,255,255,.65); color: #fff; font: 800 clamp(22px, 4vw, 32px) var(--font);
+  background: rgba(255,255,255,.14); border: 3px solid rgba(255,255,255,.55); color: #fff; font: 800 clamp(22px, 4vw, 32px) var(--font);
   display: flex; align-items: center; justify-content: center; touch-action: none; }
 .tb.big { width: clamp(78px, 13vw, 110px); height: clamp(78px, 13vw, 110px); }
 .tb.on { background: rgba(255,255,255,.5); transform: scale(.94); }
 
 /* ---------- screens ---------- */
-.screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+.screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 14px;
   padding: calc(16px + var(--safe-t)) calc(16px + var(--safe-r)) calc(16px + var(--safe-b)) calc(16px + var(--safe-l));
-  background: linear-gradient(180deg, rgba(20,14,10,.35), rgba(20,14,10,.55)); overflow-y: auto; }
+  background: linear-gradient(180deg, rgba(20,14,10,.35), rgba(20,14,10,.55)); overflow-y: auto; touch-action: pan-y; }
+.screen > :first-child { margin-top: auto; }
+.screen > :last-child { margin-bottom: auto; }
 .screen.dim { background: rgba(20,14,10,.72); }
 h2 { margin: 0; font-size: clamp(30px, 6vw, 52px); color: var(--gold); letter-spacing: 1px; }
 
@@ -69,6 +71,7 @@ h2 { margin: 0; font-size: clamp(30px, 6vw, 52px); color: var(--gold); letter-sp
 .hint { margin: 0; color: #fff; opacity: .85; font-weight: 600; text-align: center; font-size: clamp(13px, 2vw, 17px); text-shadow: 0 2px 0 var(--ink); }
 .foot { position: absolute; bottom: calc(8px + var(--safe-b)); margin: 0; font-size: 13px; opacity: .7; }
 .foot a { color: #fff; }
+#s-title .hint { margin-bottom: auto; }
 
 .menu { display: flex; flex-direction: column; gap: 10px; align-items: stretch; min-width: min(320px, 80vw); }
 .menu.row { flex-direction: row; flex-wrap: wrap; justify-content: center; }
@@ -81,7 +84,7 @@ h2 { margin: 0; font-size: clamp(30px, 6vw, 52px); color: var(--gold); letter-sp
 .btn.back { background: #6b5a52; margin-top: 6px; }
 
 /* level select */
-#chapters { display: flex; flex-direction: column; gap: 12px; width: min(860px, 100%); }
+#chapters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 12px; width: min(1100px, 100%); }
 .chap { background: rgba(255,248,232,.12); border: 2px solid rgba(255,255,255,.2); border-radius: 18px; padding: 10px 14px 14px; }
 .chap h3 { margin: 0 0 8px; font-size: clamp(17px, 2.6vw, 22px); color: var(--gold); text-shadow: 0 2px 0 var(--ink); }
 .chap h3 small { color: var(--sky); font-weight: 600; margin-left: 8px; font-size: .75em; }
@@ -146,7 +149,6 @@ h2 { margin: 0; font-size: clamp(30px, 6vw, 52px); color: var(--gold); letter-sp
 
 @media (max-height: 460px) {
   .screen { gap: 8px; justify-content: flex-start; padding-top: calc(10px + var(--safe-t)); }
-  #s-title { justify-content: center; }
   .logo .l1, .logo .l2 { font-size: clamp(40px, 15vh, 80px); }
   .menu { gap: 7px; }
   .btn { padding: 6px 20px 4px; font-size: 18px; }

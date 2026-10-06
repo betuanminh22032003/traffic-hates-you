@@ -21,11 +21,14 @@ const START_MIN = 6 * 60 + 30, PER_LEVEL_MIN = 5;
 const view = new View($('gl'), $('ov'));
 const quality = () => (S.settings.quality === 'auto' ? (isTouch ? 'medium' : 'high') : S.settings.quality);
 view.setQuality(quality());
+if (isTouch) view.padY = 80;
+view.touch = isTouch;
 
 /* ---------- state ---------- */
 let mode = 'title';          // title | menu | chapter | play | pause | end
 let lvIdx = 0, world = null, levelDeaths = 0, cardShown = false, chapterT = 0;
 let attractWorld = null;
+let frozen = false;          // test hook: stop real-time stepping
 let returnTo = 's-title';    // where "back" from settings/select goes
 const theme = i => CHAPTERS[LEVELS[i].ch].theme;
 
@@ -306,7 +309,7 @@ function loop(now) {
   const pad = pollPad();
   const inp = { left: !!(keys.ArrowLeft || keys.KeyA || touch.l || pad.l), right: !!(keys.ArrowRight || keys.KeyD || touch.r || pad.r) };
   if (mode === 'chapter') { chapterT += dt; if (chapterT > 110) { show(null); mode = 'play'; } }
-  if (mode === 'play') {
+  if (mode === 'play' && !frozen) {
     acc += dt; let n = 0;
     while (acc >= 1 && n < 5) { tick({ ...inp, jump: jumpQueued }); jumpQueued = false; acc -= 1; n++; }
     if (n === 5) acc = 0;
@@ -335,5 +338,6 @@ function loop(now) {
 // test / debug hook
 window.__thy = {
   get world() { return world; }, get mode() { return mode; }, get view() { return view; },
-  start: i => startLevel(i, false), keys, tick: (inp) => tick(inp)
+  start: i => startLevel(i, false), keys, tick: (inp) => tick(inp),
+  set frozen(v) { frozen = v; }
 };

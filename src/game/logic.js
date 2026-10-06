@@ -236,12 +236,12 @@ export const KINDS = {
     }
   },
 
-  // Low banner across the street. Optionally drops lower when you approach.
+  // Low-hanging banner (hung from the wires, centred on x, 2*hw wide). Optionally drops lower when you approach.
   banner: {
-    init(e) { e.y ??= G - 130; e.h ??= 34; e.cur = e.y; },
+    init(e) { e.y ??= G - 130; e.h ??= 34; e.hw ??= 50; e.cur = e.y; },
     update(w, e, dt, ev) {
       if (e.drop != null && w.p.x > e.trig && e.cur < e.drop) { if (e.cur === e.y) ev('creak'); e.cur = Math.min(e.drop, e.cur + 6 * dt); }
-      if (overlap(pbox(w.p), { x: e.x - 6, y: e.cur, w: 12, h: e.h })) die(w, 'banner', ev);
+      if (overlap(pbox(w.p), { x: e.x - e.hw, y: e.cur, w: e.hw * 2, h: e.h })) die(w, 'banner', ev);
     }
   },
 
