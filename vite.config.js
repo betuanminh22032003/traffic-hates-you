@@ -1,11 +1,14 @@
 import { defineConfig } from 'vite';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 
-// Stamp the service worker with a build id so each release gets its own cache.
-const stampServiceWorker = () => ({
-  name: 'stamp-sw',
+// The editable page is game.html; the build writes dist/index.html, and `npm run build`
+// then copies dist/ to the repo root so GitHub Pages works whether it publishes from the
+// branch root or from the Actions artifact.
+const finishBuild = () => ({
+  name: 'finish-build',
   apply: 'build',
   closeBundle() {
+    if (existsSync('dist/game.html')) renameSync('dist/game.html', 'dist/index.html');
     const f = 'dist/sw.js';
     if (existsSync(f)) writeFileSync(f, readFileSync(f, 'utf8').replace('__BUILD__', Date.now().toString(36)));
   }
@@ -14,7 +17,7 @@ const stampServiceWorker = () => ({
 // base './' so the build works from any sub-path (itch.io, GitHub Pages, a CDN folder).
 export default defineConfig({
   base: './',
-  build: { target: 'es2020', chunkSizeWarningLimit: 900, assetsInlineLimit: 0 },
-  server: { host: true },
-  plugins: [stampServiceWorker()]
+  build: { target: 'es2020', chunkSizeWarningLimit: 900, assetsInlineLimit: 0, rollupOptions: { input: 'game.html' } },
+  server: { host: true, open: '/game.html' },
+  plugins: [finishBuild()]
 });

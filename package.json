@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/publish-root.mjs",
     "preview": "vite preview",
     "test": "node scripts/smoke-test.mjs",
     "icons": "node scripts/make-icons.mjs"

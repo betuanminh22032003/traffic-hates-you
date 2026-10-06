@@ -32,24 +32,24 @@ Cần Node.js 20 trở lên.
 
 ```bash
 npm install
-npm run dev        # mở http://localhost:5173
+npm run dev        # mở http://localhost:5173/game.html
 npm test           # bot tự chơi 15 màn, xác nhận màn nào cũng qua được
-npm run build      # xuất bản phát hành vào thư mục dist/
+npm run build      # build vào dist/ và chép bản build ra thư mục gốc repo
 npm run preview    # chạy thử bản build
 ```
 
 ## Phát hành
 
-`npm run build` tạo thư mục `dist/` gồm toàn file tĩnh (HTML, JS, font, icon). Bản build dùng đường dẫn tương đối nên đặt ở thư mục nào cũng chạy.
+`npm run build` tạo thư mục `dist/` gồm toàn file tĩnh (HTML, JS, font, icon) và chép luôn ra thư mục gốc repo (`index.html`, `assets/`, `icons/`, `sw.js`...). Bản build dùng đường dẫn tương đối nên đặt ở thư mục nào cũng chạy. Mã nguồn trang nằm ở `game.html`; đừng sửa tay `index.html` ở gốc vì nó là file build.
 
 ### GitHub Pages (tự động)
 
-Workflow `.github/workflows/deploy.yml` đã có sẵn: mỗi lần push lên `main` sẽ chạy test, build và đăng lên Pages.
+Workflow `.github/workflows/deploy.yml` đã có sẵn: mỗi lần push lên `main` sẽ chạy test, build, cập nhật bản build ở thư mục gốc và đăng lên Pages. Pages để chế độ nào cũng chạy:
 
-1. Vào repo trên GitHub → **Settings → Pages**.
-2. Ở **Source** chọn **GitHub Actions**.
-3. Merge vào `main` (hoặc chạy workflow "Deploy to GitHub Pages" bằng tay trong tab Actions).
-4. Link game: `https://<tên-tài-khoản>.github.io/traffic-hates-you/`.
+- **Deploy from a branch** (`main` / root): Pages phục vụ bản build ở thư mục gốc.
+- **GitHub Actions**: Pages phục vụ `dist/` do workflow tải lên.
+
+Link game: `https://betuanminh22032003.github.io/traffic-hates-you/`.
 
 ### itch.io
 
@@ -71,14 +71,14 @@ Kết nối repo, build command `npm run build`, publish directory `dist`. Khôn
 
 - [ ] `npm test` báo `All levels beatable.`
 - [ ] `npm run build` không lỗi, `npm run preview` chơi thử được màn 1.
-- [ ] Đổi link/ảnh chia sẻ nếu cần: thẻ `og:*` trong `index.html`, ảnh `public/icons/og.png`.
-- [ ] Đổi phiên bản trong `package.json` và chữ `v1.0` ở màn hình tiêu đề (`index.html`).
+- [ ] Đổi link/ảnh chia sẻ nếu cần: thẻ `og:*` trong `game.html`, ảnh `public/icons/og.png`.
+- [ ] Đổi phiên bản trong `package.json` và chữ `v1.0` ở màn hình tiêu đề (`game.html`).
 - [ ] Đổi tên cache trong `public/sw.js` (`thy-v1` → `thy-v2`...) mỗi lần phát hành bản mới để người chơi cũ nhận bản mới ngay.
 
 ## Cấu trúc mã
 
 ```
-index.html              khung trang + các màn hình menu (DOM)
+game.html               khung trang + các màn hình menu (mã nguồn; index.html ở gốc là bản build)
 src/main.js             vòng lặp game, luồng màn chơi, menu, input (phím, cảm ứng, tay cầm)
 src/game/logic.js       mô phỏng gameplay thuần (không DOM, không three.js, tất định)
 src/game/levels.js      dữ liệu 15 màn + 4 chương

@@ -1,12 +1,12 @@
-# Builds the game and publishes dist/ to GitHub Pages on every push to main.
-# One-time setup: repo Settings → Pages → Source: "GitHub Actions".
+# On every push to main: test, build, keep the built game at the repo root in sync
+# (for Pages "Deploy from a branch"), and publish dist/ to Pages (for Pages "GitHub Actions").
 name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 concurrency:
@@ -24,12 +24,22 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - name: Commit the built game at the repo root if it changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A index.html assets icons sw.js manifest.webmanifest .nojekyll
+          if ! git diff --cached --quiet; then
+            git commit -m "Update built game [skip ci]"
+            git push
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    continue-on-error: true
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
