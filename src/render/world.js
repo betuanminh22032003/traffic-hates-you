@@ -323,7 +323,9 @@ function makeRain() {
 export function buildWorld(level, ents, theme, map) {
   const th = THEMES[theme];
   const seed = level.id * 31 + 7;
-  const holes = ents.filter(e => e.k === 'hole');
+  // a creeping hole cuts the ground along its whole range (the view fills the rest with fake ground)
+  const holes = ents.filter(e => e.k === 'hole').map(h => !h.chase ? h
+    : h.chase === 'x' ? { x: h.lo, z: h.z0 ?? h.z, w: h.hi - h.lo + h.w, d: h.d } : { x: h.x0 ?? h.x, z: h.lo, w: h.w, d: h.hi - h.lo + h.d });
   const treeTiles = new Set(ents.filter(e => e.k === 'pole' && e.kind === 'tree').map(e => Math.floor(e.x / T) + ',' + Math.floor(e.z / T)));
   const raw = new THREE.Group();
   buildGround(raw, map, th, holes, treeTiles);

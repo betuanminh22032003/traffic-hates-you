@@ -41,6 +41,15 @@ h2, .logo div, .head, .chap-no, .chap-name, .end-time, .pill, .btn {
 .pill.speed { min-width: 92px; text-align: center; }
 .pill.speed.over { color: var(--red); }
 .pill.late { color: var(--red); }
+.pill.speed.slowmode { color: var(--sky); }
+#call { position: fixed; top: calc(56px + var(--safe-t)); left: 50%; transform: translateX(-50%); width: min(420px, 88vw); z-index: 30; pointer-events: none;
+  background: rgba(28, 28, 32, .94); border: 3px solid var(--ink); border-radius: 22px; padding: 14px 18px 12px; text-align: center; animation: callin .35s cubic-bezier(.2,1.6,.4,1) both; box-shadow: 0 8px 0 rgba(0,0,0,.35); }
+@keyframes callin { from { transform: translate(-50%, -140%); } }
+#call .call-who { font-weight: 800; font-size: clamp(22px, 4vw, 30px); color: var(--gold); animation: blink .5s steps(2) infinite; }
+#call .call-msg { font-weight: 700; font-size: clamp(15px, 2.8vw, 20px); margin: 4px 0 10px; }
+#call .call-btns { display: flex; justify-content: space-around; font-size: 26px; }
+#call .call-btns span { width: 52px; height: 52px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; border: 3px solid var(--ink); }
+#call .no { background: var(--red); } #call .yes { background: var(--green); }
 .pill.icon { pointer-events: auto; font-size: clamp(15px, 2.2vw, 20px); padding: 6px 12px; }
 
 /* ---------- touch controls: floating joystick (left half) + jump button ---------- */
@@ -55,6 +64,7 @@ h2, .logo div, .head, .chap-no, .chap-name, .end-time, .pill, .btn {
   background: rgba(255,255,255,.16); border: 3px solid rgba(255,255,255,.6); color: #fff; font: 800 clamp(26px, 5vw, 36px) var(--font);
   display: flex; align-items: center; justify-content: center; touch-action: none; }
 .tb.big { width: clamp(84px, 14vw, 116px); height: clamp(84px, 14vw, 116px); }
+.tb.slow { width: clamp(60px, 10vw, 80px); height: clamp(60px, 10vw, 80px); bottom: calc(22px + var(--safe-b) + clamp(96px, 16vw, 130px)); right: calc(34px + var(--safe-r)); font-size: clamp(22px, 4vw, 30px); }
 .tb.on { background: rgba(255,255,255,.5); transform: scale(.94); }
 
 /* ---------- screens ---------- */
@@ -133,6 +143,8 @@ h2 { margin: 0; font-size: clamp(30px, 6vw, 52px); color: var(--gold); letter-sp
 .card-ov .head.ok { color: var(--green); }
 .card-ov .msg { font-weight: 800; font-size: clamp(18px, 3.4vw, 28px); max-width: 760px; text-shadow: 0 2px 0 var(--ink), 0 -1px 0 var(--ink), 2px 0 0 var(--ink), -2px 0 0 var(--ink); }
 .card-ov .sub { font-weight: 700; color: var(--gold); font-size: clamp(14px, 2.4vw, 19px); text-shadow: 0 2px 0 var(--ink); }
+.card-ov .taunt { color: #ffb4a8; }
+.card-ov .btn.small { font-size: clamp(15px, 2.4vw, 19px); padding: 8px 18px 6px; pointer-events: auto; }
 .card-ov .tap { font-weight: 700; color: var(--sky); font-size: clamp(15px, 2.6vw, 22px); text-shadow: 0 2px 0 var(--ink); }
 .blink { animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { opacity: .35; } }

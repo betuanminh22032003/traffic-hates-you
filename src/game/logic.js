@@ -4,7 +4,11 @@
 // Deterministic, so scripts/smoke-test.mjs can replay a bot and prove every level is beatable.
 
 export const T = 80;                 // tile size
-export const MAXV = 4.4, GRAV = 0.55, JUMP = 9.6, PR = 16, PH = 50;
+export const MAXV = 4.0, GRAV = 0.5, JUMP = 10.4, PR = 16, PH = 50;
+// Throttle: you reach CRUISE (~34 km/h) almost at once, then the engine needs ~1 s more to wind up to MAXV (~68 km/h).
+// Letting go or holding SLOW (Shift / 🐢) brings the speed down quickly, so speed cameras are a skill, not a coin toss.
+export const CRUISE = 2.0, JBOOST = 2.8;
+const DRY = { lo: 0.32, hi: 0.04, dec: 0.3 }, WET = { lo: 0.2, hi: 0.03, dec: 0.12 };
 export const WIRE_H = 250;           // the wire spaghetti over every street: get launched up there and you're toast
 export const KMH = 17;               // px/frame -> km/h on the speedometer
 
@@ -12,6 +16,7 @@ const noop = () => {};
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const inRect = (x, z, r, pad = 0) => x > r.x - pad && x < r.x + r.w + pad && z > r.z - pad && z < r.z + r.d + pad;
 const dist = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
+const speedOf = p => Math.hypot(p.vx, p.vz);
 
 /* ---------- map ---------- */
 // '#' house, 'T' tree, 'K' kiosk/wall  -> solid
@@ -59,14 +64,23 @@ export const KINDS = {
   deco: {},
 
   // Pothole / collapsing road over a rect. hidden = looks like road until you come close.
+  // chase: 'x' | 'z' = the (hidden) hole creeps along that axis to stay under you until it opens, within [lo, hi] px.
   hole: {
-    init(e) { e.open = !e.hidden; },
-    update(w, e, dt, ev) { if (!e.open && triggered(w, e)) { e.open = true; ev('crack', { x: e.x + e.w / 2, z: e.z + e.d / 2, w: e.w }); } }
+    init(e) { e.open = !e.hidden; e.x0 = e.x; e.z0 = e.z; },
+    update(w, e, dt, ev) {
+      const p = w.p;
+      if (e.chase && !e.open && w.status === 'play' && dist(p.x, p.z, e.x + e.w / 2, e.z + e.d / 2) < (e.cr ?? 260)) {
+        const k = e.chase === 'x' ? 'x' : 'z', size = k === 'x' ? e.w : e.d, want = clamp(p[k] - size / 2, e.lo, e.hi);
+        const mv = clamp(want - e[k], -(e.cs ?? 1.6) * dt, (e.cs ?? 1.6) * dt);
+        e[k] += mv; if (e.tx != null && k === 'x') e.tx += mv; if (e.tz != null && k === 'z') e.tz += mv;
+      }
+      if (!e.open && triggered(w, e)) { e.open = true; ev('crack', { x: e.x + e.w / 2, z: e.z + e.d / 2, w: e.w }); }
+    }
   },
 
   // Unleashed dog: sleeps until you come near, then chases you around corners for a while.
   dog: {
-    init(e) { e.on = false; e.t = 0; e.speed ??= 3.7; e.turn ??= 0.045; e.tr ??= 170; e.life ??= 300; e.hx = -1; },
+    init(e) { e.on = false; e.t = 0; e.speed ??= 3.1; e.turn ??= 0.045; e.tr ??= 170; e.life ??= 300; e.hx = -1; },
     update(w, e, dt, ev) {
       const p = w.p;
       if (!e.on) { if (triggered(w, e)) { e.on = true; ev('bark'); } return; }
@@ -82,7 +96,7 @@ export const KINDS = {
         if (!solidTileNear(w, e.x, nz, 12)) e.z = nz;
         e.hx = Math.cos(e.ang); e.hz = Math.sin(e.ang);
       }
-      if (dist(p.x, p.z, e.x, e.z) < PR + 15 && p.h < 26) die(w, 'dog', ev);
+      if (e.t < e.life && dist(p.x, p.z, e.x, e.z) < PR + 15 && p.h < 26) die(w, 'dog', ev); // a tired dog just lies there
     }
   },
 
@@ -196,14 +210,111 @@ export const KINDS = {
     }
   },
 
-  // Speed camera zone.
+  // Speed camera zone. kmh = the posted limit. min = it's a MINIMUM speed zone (dawdle and the truck behind wins).
+  // A few frames of grace so brushing the limit for an instant is forgiven.
   speedcam: {
-    init(e) { e.lim ??= 2.6; e.flash = 0; e.done = false; },
+    init(e) { e.kmh ??= 40; e.lim = e.kmh / KMH; e.flash = 0; e.done = false; e.over = 0; },
     update(w, e, dt, ev) {
       if (e.flash > 0) e.flash -= dt;
       const p = w.p;
-      if (!e.done && inRect(p.x, p.z, e) && Math.hypot(p.vx, p.vz) > e.lim) { e.done = true; e.flash = 30; ev('flash'); die(w, 'speed', ev); }
+      if (e.done || !inRect(p.x, p.z, e)) { e.over = 0; return; }
+      const bad = e.min ? speedOf(p) < e.lim && p.onGround : speedOf(p) > e.lim + 0.02;
+      e.over = bad ? e.over + dt : 0;
+      if (e.over > (e.min ? 14 : 5)) { e.done = true; e.flash = 30; ev('flash'); die(w, e.min ? 'slow' : 'speed', ev); }
     }
+  },
+
+  // Oil spill: on it you cannot steer or brake, you keep sliding the way you came in.
+  oil: {},
+
+  // Speed bump. Hit it fast and it launches you into the wire spaghetti. Slow (or airborne) is fine.
+  bump: {
+    init(e) { e.kmh ??= 40; e.lim = e.kmh / KMH; e.inside = false; },
+    update(w, e, dt, ev) {
+      const p = w.p, on = w.status === 'play' && inRect(p.x, p.z, e, PR - 8);
+      if (on && !e.inside && p.onGround && p.h < 1) {
+        const sp = speedOf(p);
+        if (sp > e.lim + 0.02) { p.vh = 19; p.onGround = false; p.launched = true; e.hit = 40; ev('boing', { x: p.x, z: p.z }); }
+        else if (sp > 1) { p.vh = 3; p.onGround = false; ev('land', { air: 12 }); }
+      }
+      if (e.hit > 0) e.hit -= dt;
+      e.inside = on;
+    }
+  },
+
+  // Auntie on a balcony throwing slippers / buckets of water at where you WILL be. Shadows show where they land.
+  thrower: {
+    init(e) { e.shots = []; e.cd = e.offset ?? 30; e.every ??= 75; e.flight ??= 46; e.tr ??= 420; e.lead ??= 0.8; e.kind ??= 'dep'; e.on = false; },
+    update(w, e, dt, ev) {
+      const p = w.p;
+      e.on = w.status === 'play' && triggered(w, e);
+      if (e.on) {
+        e.cd -= dt;
+        if (e.cd <= 0) {
+          e.cd = e.every;
+          const tx = p.x + p.vx * e.flight * e.lead, tz = p.z + p.vz * e.flight * e.lead;
+          e.shots.push({ sx: e.x, sz: e.z, tx, tz, t: 0, done: false });
+          ev('throw');
+        }
+      }
+      for (const s of e.shots) {
+        if (s.done) { s.t += dt; continue; }
+        s.t += dt;
+        if (s.t >= e.flight) {
+          s.done = true; s.t = 0; ev('splat', { x: s.tx, z: s.tz });
+          if (w.status === 'play' && dist(p.x, p.z, s.tx, s.tz) < 38 && p.h < 40) die(w, 'thrower_' + e.kind, ev);
+        }
+      }
+      e.shots = e.shots.filter(s => !s.done || s.t < 50);
+    }
+  },
+
+  // Car door flung open / tree branch punching out across the path. Hinge at (x,z), swings out along (dx,dz).
+  // door: opens once and stays open (a low obstacle you can hop). branch: punches out and back while you're near.
+  door: {
+    init(e) { e.kind ??= 'door'; e.len ??= e.kind === 'branch' ? 110 : 60; e.a = 0; e.st = 0; e.t = 0; e.tr ??= 120; e.dx ??= 0; e.dz ??= 1; },
+    update(w, e, dt, ev) {
+      const p = w.p;
+      if (e.kind === 'door') {
+        if (e.st === 0 && triggered(w, e)) { e.st = 1; ev('door'); }
+        if (e.st === 1) { e.a = Math.min(1, e.a + 0.14 * dt); if (e.a >= 1) e.st = 2; }
+      } else {
+        // branch: wind up (shakes), punch (fast), hold, retract, rest; repeats while you are around
+        if (e.st === 0) { if (triggered(w, e)) { e.st = 1; e.t = e.offset ?? 0; } }
+        if (e.st === 1) {
+          e.t += dt;
+          const c = e.t % (e.cycle ?? 110);
+          if (c < 30) e.a = 0; else if (c < 36) { if (e.a === 0) ev('punch'); e.a = (c - 30) / 6; } else if (c < 60) e.a = 1; else if (c < 80) e.a = 1 - (c - 60) / 20; else e.a = 0;
+          e.wind = c >= 14 && c < 30;
+        }
+      }
+      if (w.status === 'play' && e.a > 0.25 && overlapP(p, doorBox(e)) && p.h < (e.kind === 'branch' ? 80 : 46)) die(w, e.kind, ev);
+    },
+    solids(e) { return e.kind === 'door' && e.st === 2 ? [{ ...doorBox(e), top: 46 }] : []; }
+  },
+
+  // A finish arch that is a lie: you get the "QUA MÀN!" card, then something lands where you stand.
+  // The real finish (finish with after: true) only shows up afterwards.
+  fakewin: {
+    init(e) { e.st = 0; e.t = 0; e.y = 360; e.vy = 0; e.size = 64; e.drop ??= 40; },
+    update(w, e, dt, ev) {
+      const p = w.p;
+      if (e.st === 0) { if (w.status === 'play' && p.onGround && dist(p.x, p.z, e.x, e.z) < 36) { e.st = 1; e.t = 0; ev('fakeclear'); } return; }
+      e.t += dt;
+      if (e.st === 1 && e.t > e.drop) { e.st = 2; e.fx = p.x; e.fz = p.z; ev('whoosh'); }
+      if (e.st === 2) {
+        e.vy += 0.6 * dt; e.y -= e.vy * dt;
+        if (w.status === 'play' && Math.abs(p.x - e.fx) < e.size / 2 + PR - 4 && Math.abs(p.z - e.fz) < e.size / 2 + PR - 4 && e.y < p.h + PH) die(w, 'fakewin', ev);
+        if (e.y <= 0) { e.y = 0; e.st = 3; w.flags.fake = true; ev('thud', { x: e.fx, z: e.fz, big: true }); ev('hehe'); }
+      }
+    },
+    solids(e) { return e.st === 3 ? [{ x: e.fx - e.size / 2, z: e.fz - e.size / 2, w: e.size, d: e.size, top: 44 }] : []; }
+  },
+
+  // Fake phone call / notification that pops over the screen right when things get busy (UI only).
+  call: {
+    init(e) { e.done = false; e.tr ??= 60; },
+    update(w, e, dt, ev) { if (!e.done && w.status === 'play' && triggered(w, e)) { e.done = true; ev('call', { who: e.who, s: e.s, dur: e.dur ?? 120 }); } }
   },
 
   // Barrier that rises across a rect when you come near and then blocks the way.
@@ -241,6 +352,7 @@ export const KINDS = {
     init(e) { e.ran = false; e.moving = false; e.runR ??= 150; },
     update(w, e, dt, ev) {
       const p = w.p;
+      if (e.after && !w.flags.fake) return;
       if (e.rx != null && !e.ran && dist(p.x, p.z, e.x, e.z) < e.runR) { e.ran = true; e.moving = true; ev('hehe'); }
       if (e.moving) {
         const dx = e.rx - e.x, dz = e.rz - e.z, d = Math.hypot(dx, dz);
@@ -289,6 +401,11 @@ function spawn(w, e, ev) {
   if (e.aim) { if (e.dx) e.cz = w.p.z; else e.cx = w.p.x; }
   ev('honk', { x: e.cx, z: e.cz, behind: e.behind });
 }
+function doorBox(e) {
+  const L = e.len * e.a, th = e.kind === 'branch' ? 22 : 12;
+  const x1 = e.x + e.dx * L, z1 = e.z + e.dz * L;
+  return { x: Math.min(e.x, x1) - (e.dx ? 0 : th / 2), z: Math.min(e.z, z1) - (e.dz ? 0 : th / 2), w: Math.abs(x1 - e.x) + (e.dx ? 0 : th), d: Math.abs(z1 - e.z) + (e.dz ? 0 : th) };
+}
 function moverBox(e) {
   const along = e.len / 2, across = e.wid / 2;
   const hw = e.dx ? along : across, hd = e.dx ? across : along;
@@ -301,11 +418,15 @@ function solidTileNear(w, x, z, r) {
 }
 
 /* ---------- world ---------- */
-export function makeWorld(def) {
+// attempt = how many times you already died on this level. Entities can exist only on some attempts:
+//   first: true -> only the very first try;  retry: true -> only after you died once (n: from the n-th retry).
+// That's the troll: the trap you just memorised moves.
+export const presentOn = (e, attempt) => (e.first ? attempt === 0 : true) && (e.retry ? attempt >= (e.n ?? 1) : true);
+export function makeWorld(def, { attempt = 0 } = {}) {
   const map = parseMap(def.map);
-  const ents = def.build();
+  const ents = def.build().filter(e => presentOn(e, attempt));
   const w = {
-    def, map, ents, t: 0, status: 'play', cause: null, deadT: 0, clearT: 0, rain: !!def.rain,
+    def, map, ents, attempt, flags: {}, t: 0, status: 'play', cause: null, deadT: 0, clearT: 0, rain: !!def.rain, idle: 0,
     p: { x: map.start.x, z: map.start.z, h: 0, vx: 0, vz: 0, vh: 0, onGround: true, coy: 0, air: 0, jumpBuf: 0,
       water: false, wt: 0, rideVx: 0, rideVz: 0, onEnt: null, onPlat: false, heading: Math.PI / 2, wheel: 0, spin: 0 }
   };
@@ -335,15 +456,34 @@ function blocked(w, x, z, h, solids) {
 }
 
 function updPlayer(w, inp, dt, ev) {
-  const p = w.p, slip = w.rain;
+  const p = w.p, R = w.rain ? WET : DRY;
   let mx = inp.mx || 0, mz = inp.mz || 0;
   const m = Math.hypot(mx, mz); if (m > 1) { mx /= m; mz /= m; }
-  const vmax = p.water ? 1.4 : MAXV, acc = (slip ? 0.22 : 0.7) * dt, dec = (slip ? 0.07 : 0.6) * dt;
-  for (const [k, tgt] of [['vx', mx * vmax], ['vz', mz * vmax]]) {
-    const d = tgt - p[k], a = tgt === 0 || Math.sign(tgt) !== Math.sign(p[k]) && p[k] !== 0 ? Math.max(acc, dec) : acc;
-    p[k] += clamp(d, -a, a);
+  const vmax = p.water ? 1.4 : inp.slow ? Math.min(CRUISE, MAXV) : MAXV;
+  const onOil = p.onGround && p.h < 1 && !p.onPlat && w.ents.some(e => e.k === 'oil' && inRect(p.x, p.z, e, -6));
+  if (onOil && !p.oil) ev('slip');
+  p.oil = onOil;
+  // Throttle: speeding up along your heading is fast up to cruise speed and slow beyond it;
+  // braking and steering (the sideways part) are quick. On oil none of it works.
+  const tx = mx * vmax, tz = mz * vmax, sp = speedOf(p);
+  if (!onOil) {
+    if (sp < 0.05) {
+      const tl = Math.hypot(tx, tz), k = tl > 0 ? Math.min(1, R.lo * dt / tl) : 0;
+      p.vx += (tx - p.vx) * k; p.vz += (tz - p.vz) * k;
+    } else {
+      const ux = p.vx / sp, uz = p.vz / sp, al = tx * ux + tz * uz;      // wanted speed along the heading
+      const px_ = tx - al * ux, pz_ = tz - al * uz, pl = Math.hypot(px_, pz_); // wanted sideways velocity
+      const ns = al > sp ? sp + Math.min(al - sp, (sp < CRUISE ? R.lo : R.hi) * dt) : sp - Math.min(sp - al, R.dec * dt);
+      const k = pl > 0 ? Math.min(1, Math.max(R.dec, 0.2) * dt / pl) : 0;
+      p.vx = ux * ns + px_ * k; p.vz = uz * ns + pz_ * k;
+    }
   }
-  if (p.jumpBuf > 0 && (p.onGround || p.coy > 0)) { p.vh = JUMP; p.onGround = false; p.coy = 0; p.jumpBuf = 0; ev('jump'); }
+  w.idle = sp < 0.2 && m < 0.1 ? w.idle + dt : 0;
+  if (p.jumpBuf > 0 && (p.onGround || p.coy > 0)) {
+    p.vh = JUMP; p.onGround = false; p.coy = 0; p.jumpBuf = 0; ev('jump');
+    // a jump kicks you forward to at least JBOOST along the stick, so standing jumps still clear a gap
+    if (m > 0.3 && !onOil) { const ux = mx / m, uz = mz / m, al = p.vx * ux + p.vz * uz, want = JBOOST * Math.min(1, m); if (al < want) { p.vx += (want - al) * ux; p.vz += (want - al) * uz; } }
+  }
   p.jumpBuf = Math.max(0, p.jumpBuf - dt); p.coy = Math.max(0, p.coy - dt);
   p.vh -= GRAV * dt;
 
@@ -377,10 +517,11 @@ function updPlayer(w, inp, dt, ev) {
   p.water = p.onGround && !p.onPlat && p.h < 1 && tileAt(w.map, p.x, p.z) === '~';
   if (p.water) { p.wt += dt; if (p.wt > 80) die(w, 'flood', ev); } else p.wt = 0;
   if (p.h < -170) die(w, 'fall', ev);
-  if (p.h + PH > WIRE_H) die(w, 'zap', ev);
-  const sp = Math.hypot(p.vx, p.vz);
-  p.wheel += sp * dt / 13;
-  if (sp > 0.6) p.heading = Math.atan2(-p.vz, p.vx);
+  if (p.h + PH > WIRE_H) die(w, p.launched ? 'bump' : 'zap', ev);
+  if (p.onGround) p.launched = false;
+  const sp2 = speedOf(p);
+  p.wheel += sp2 * dt / 13;
+  if (sp2 > 0.6) p.heading = Math.atan2(-p.vz, p.vx);
 }
 
 // inp = { mx, mz, jump }: mx/mz in [-1, 1] (right / toward camera), jump = pressed this frame.
