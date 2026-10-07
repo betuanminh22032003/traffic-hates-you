@@ -3,6 +3,6 @@ import { LEVELS } from '../src/game/levels.js';
 import { SOLUTIONS } from './solutions.mjs';
 import { run } from './sim.mjs';
 const id = +process.argv[2], from = +(process.argv[3] ?? 0), to = +(process.argv[4] ?? 1e9);
-const r = run(LEVELS.find(l => l.id === id), SOLUTIONS[id], { trace: true });
+const r = run(LEVELS.find(l => l.id === id), (s0 => Array.isArray(s0) ? s0 : s0[+(process.env.ATT ?? 5)])(SOLUTIONS[id]), { trace: true, attempt: +(process.env.ATT ?? 5) });
 console.log(r.log.filter(l => { const t = +l.split(' ')[0]; return t >= from && t <= to; }).join('\n'));
 console.log(r.status, r.cause, r.x.toFixed(2), r.z.toFixed(2));

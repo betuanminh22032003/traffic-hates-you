@@ -8,7 +8,7 @@ import './style.css';
 import './polyfills.js';
 import { makeWorld, step, KMH } from './game/logic.js';
 import { LEVELS, CHAPTERS } from './game/levels.js';
-import { deathText, HEAD } from './game/messages.js';
+import { deathText, HEAD, taunt, CALLS } from './game/messages.js';
 import { View } from './render/view.js';
 import * as A from './audio.js';
 import { store, save, resetProgress } from './save.js';
@@ -27,6 +27,7 @@ view.touch = isTouch;
 /* ---------- state ---------- */
 let mode = 'title';          // title | menu | chapter | play | pause | end
 let lvIdx = 0, world = null, levelDeaths = 0, cardShown = false, chapterT = 0;
+let causeCount = {}, grabTried = false, fakeAt = -1, callUntil = -1;
 let attractWorld = null;
 let frozen = false;          // test hook: stop real-time stepping
 let returnTo = 's-title';    // where "back" from settings/select goes
@@ -56,7 +57,7 @@ function goTitle() {
   world = null;
   $('b-play').textContent = canContinue() ? `TIẾP TỤC · MÀN ${runLevel() + 1}` : 'CHƠI';
   $('b-new').classList.toggle('hidden', !canContinue());
-  $('title-hint').textContent = isTouch ? 'Cần gạt trái: chạy 8 hướng · nút phải: nhảy' : '←↑→↓ / WASD chạy 8 hướng · SPACE nhảy · R chơi lại · ESC tạm dừng';
+  $('title-hint').textContent = isTouch ? 'Cần gạt trái: chạy · ⤒ nhảy · 🐢 giữ để chạy chậm' : '←↑→↓ / WASD chạy · SPACE nhảy · giữ SHIFT chạy chậm · R chơi lại · ESC tạm dừng';
   show('s-title');
   A.playMusic(0);
 }
@@ -111,6 +112,15 @@ function toggleFullscreen() {
 }
 
 /* ---------- menu buttons ---------- */
+// The very first time the mouse goes for PLAY, the button dodges. Once.
+let dodged = false;
+$('b-play').addEventListener('mouseenter', () => {
+  if (dodged || isTouch || mode !== 'title') return;
+  dodged = true;
+  const b = $('b-play'); b.style.transition = 'transform .12s'; b.style.transform = `translate(${Math.random() < 0.5 ? -170 : 170}px, 0)`;
+  A.sfx('hehe'); toast('Hụt 😜');
+  setTimeout(() => { b.style.transform = ''; }, 1400);
+});
 $('b-play').onclick = () => { A.sfx('click'); if (canContinue()) startLevel(runLevel(), true); else newRun(); };
 $('b-new').onclick = () => { A.sfx('click'); newRun(); };
 $('b-select').onclick = () => { A.sfx('click'); buildSelect(); returnTo = 's-title'; show('s-select'); };
@@ -134,11 +144,11 @@ function startLevel(i, intro, fromSelect = false) {
   if (fromSelect && i !== runLevel()) S.run.full = false;
   S.run.level = i; save();
   const chapterStart = i === 0 || LEVELS[i - 1].ch !== LEVELS[i].ch;
-  lvIdx = i; levelDeaths = 0; jumpQueued = false;
-  world = makeWorld(LEVELS[i]);
+  lvIdx = i; levelDeaths = 0; jumpQueued = false; causeCount = {}; grabTried = false;
+  world = makeWorld(LEVELS[i], { attempt: 0 });
   view.attractMode = false;
   view.load(world, theme(i));
-  hideCards(); setHud(true); updateHud(true);
+  hideCards(); hideCall(); setHud(true); updateHud(true);
   A.playMusic(LEVELS[i].ch);
   if (intro && chapterStart) {
     const c = CHAPTERS[LEVELS[i].ch];
@@ -152,14 +162,16 @@ function endChapterSplash() {
   if (!document.hasFocus() || isPortraitBlocked()) pause(true);
 }
 
+// Every retry rebuilds the level for this attempt number: some traps only exist on the first try, some only after.
 function retry() {
-  world = makeWorld(LEVELS[lvIdx]);
-  view.reset(world);
-  hideCards(); mode = 'play'; show(null); jumpQueued = false;
+  world = makeWorld(LEVELS[lvIdx], { attempt: levelDeaths });
+  view.load(world, theme(lvIdx));
+  hideCards(); hideCall(); mode = 'play'; show(null); jumpQueued = false;
 }
 
 function onDeath() {
   levelDeaths++;
+  causeCount[world.cause] = (causeCount[world.cause] || 0) + 1;
   S.totalDeaths++; S.run.deaths++;
   S.run.perLevel[LEVELS[lvIdx].id] = (S.run.perLevel[LEVELS[lvIdx].id] || 0) + 1;
   save();
@@ -169,8 +181,13 @@ function onDeath() {
 function showDeathCard() {
   $('dead-head').textContent = HEAD[Math.floor(Math.random() * HEAD.length)];
   $('dead-msg').textContent = deathText(world.cause);
-  $('dead-sub').textContent = `Lần chết thứ ${S.run.deaths} · đồng hồ +1 phút`;
+  const same = causeCount[world.cause] || 1;
+  $('dead-sub').textContent = `Lần chết thứ ${S.run.deaths} · đồng hồ +1 phút` + (same > 1 ? ` · chết y chang ${same} lần rồi` : '');
+  $('dead-taunt').textContent = taunt(levelDeaths);
   $('dead-tap').textContent = isTouch ? 'Chạm để thử lại' : 'Nhấn phím bất kỳ để thử lại';
+  const grab = $('dead-grab');
+  grab.classList.toggle('hidden', levelDeaths < 6 || lvIdx >= LEVELS.length - 1);
+  grab.textContent = grabTried ? '🛵 GỌI GRAB LẠI (bỏ qua màn, +15 phút)' : '🛵 GỌI GRAB (bỏ qua màn)';
   $('c-dead').classList.remove('hidden');
   cardShown = true;
 }
@@ -184,6 +201,7 @@ function onClear() {
   save();
 }
 function showClearCard() {
+  $('clear-head').textContent = 'QUA MÀN!';
   $('clear-msg').textContent = levelDeaths ? `Màn này chết ${levelDeaths} lần` : 'Không chết lần nào?! Nghi lắm...';
   $('c-clear').classList.remove('hidden');
   cardShown = true;
@@ -194,7 +212,23 @@ function nextLevel() {
   else ending();
 }
 
-function clockMin() { return START_MIN + lvIdx * PER_LEVEL_MIN + S.run.deaths; }
+function clockMin() { return START_MIN + lvIdx * PER_LEVEL_MIN + S.run.deaths + (S.run.penalty || 0); }
+
+// "Skip level" help that trolls you once: the first driver always cancels.
+$('dead-grab').addEventListener('pointerdown', (e) => e.stopPropagation());
+$('dead-grab').onclick = (e) => {
+  e.stopPropagation();
+  if (!grabTried) {
+    grabTried = true; S.run.penalty = (S.run.penalty || 0) + 1; save();
+    A.sfx('ring'); toast('🛵 Tài xế đã hủy chuyến. Lý do: "thấy mặt khách" (+1 phút)');
+    $('dead-grab').textContent = '🛵 GỌI GRAB LẠI (bỏ qua màn, +15 phút)';
+    return;
+  }
+  S.run.penalty = (S.run.penalty || 0) + 15; S.run.full = false;
+  S.unlocked = Math.max(S.unlocked, LEVELS[lvIdx].id + 1); S.run.level = lvIdx + 1; save();
+  toast('🛵 Grab chở qua màn. Phí: 15 phút + lòng tự trọng');
+  nextLevel();
+};
 const fmt = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 
 function ending() {
@@ -233,6 +267,8 @@ function pause(on) {
 
 /* ---------- input ---------- */
 const keys = {}, stick = { x: 0, y: 0 };
+let slowTouch = false;
+const slowHeld = () => keys.ShiftLeft || keys.ShiftRight || keys.KeyX || keys.KeyL || slowTouch;
 let jumpQueued = false;
 const JUMP = ['Space', 'KeyJ', 'KeyK', 'KeyZ'];
 function anyAction() {
@@ -253,7 +289,7 @@ addEventListener('keydown', (e) => {
   if (mode === 'play' && JUMP.includes(e.code)) jumpQueued = true;
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
-function releaseAll() { for (const k in keys) keys[k] = false; resetStick(); }
+function releaseAll() { for (const k in keys) keys[k] = false; slowTouch = false; resetStick(); }
 addEventListener('blur', () => { releaseAll(); if (mode === 'play') pause(true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'play') pause(true); A.suspend(document.hidden); });
 // iOS only unlocks Web Audio inside touchend/click
@@ -282,19 +318,23 @@ zone.addEventListener('pointermove', (e) => {
   stick.x = d > 0 ? dx / d * m : 0; stick.y = d > 0 ? dy / d * m : 0;
 });
 for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) zone.addEventListener(t, (e) => { if (e.pointerId === stickId) resetStick(); });
+const sb = $('ts');
+sb.addEventListener('pointerdown', (e) => { e.preventDefault(); sb.classList.add('on'); slowTouch = true; anyAction(); });
+for (const t of ['pointerup', 'pointercancel', 'pointerleave']) sb.addEventListener(t, () => { sb.classList.remove('on'); slowTouch = false; });
 const jb = $('tj');
 jb.addEventListener('pointerdown', (e) => { e.preventDefault(); jb.classList.add('on'); if (!anyAction() && mode === 'play') jumpQueued = true; });
 for (const t of ['pointerup', 'pointercancel', 'pointerleave']) jb.addEventListener(t, () => jb.classList.remove('on'));
 for (const id of ['c-dead', 'gl']) $(id).addEventListener('pointerdown', () => anyAction());
 
 // gamepad: play + menu navigation
-let padPrev = {};
+let padPrev = {}, padSlow = false;
 function pollPad() {
   const pads = navigator.getGamepads?.() || [];
   const gp = [...pads].find(Boolean);
   if (!gp) return {};
   const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0, b = i => !!gp.buttons[i]?.pressed;
-  const now = { a: b(0) || b(1), start: b(9), up: ay < -0.5 || b(12), down: ay > 0.5 || b(13), left: ax < -0.4 || b(14), right: ax > 0.4 || b(15) };
+  padSlow = b(1) || b(2) || b(4) || b(5) || b(6) || b(7);
+  const now = { a: b(0) || b(3), start: b(9), up: ay < -0.5 || b(12), down: ay > 0.5 || b(13), left: ax < -0.4 || b(14), right: ax > 0.4 || b(15) };
   const pressed = k => now[k] && !padPrev[k];
   const scr = visibleScreen();
   if (scr && mode !== 'chapter') {
@@ -323,10 +363,17 @@ function updateHud(force) {
   const m = clockMin();
   setText('hud-clock', `🕗 ${fmt(m)}`);
   $('hud-clock').classList.toggle('late', m >= 8 * 60);
-  const v = Math.round(Math.hypot(world.p.vx, world.p.vz) * KMH);
-  setText('hud-speed', `${v} km/h`);
-  const cam = world.ents.find(e => e.k === 'speedcam' && !e.done);
-  $('hud-speed').classList.toggle('over', !!cam && Math.hypot(world.p.vx, world.p.vz) > cam.lim);
+  const p = world.p, sp = Math.hypot(p.vx, p.vz), v = Math.round(sp * KMH);
+  // the posted limit of the nearest speed camera / speed bump ahead shows next to the speedometer
+  let lim = null, best = 330;
+  for (const e of world.ents) {
+    if ((e.k !== 'speedcam' || e.done) && e.k !== 'bump') continue;
+    const d = Math.hypot(Math.max(e.x - p.x, 0, p.x - e.x - e.w), Math.max(e.z - p.z, 0, p.z - e.z - e.d));
+    if (d < best) { best = d; lim = e; }
+  }
+  setText('hud-speed', lim ? `${v} km/h · ${lim.min ? '≥' : '≤'}${lim.kmh}` : `${v} km/h`);
+  $('hud-speed').classList.toggle('over', !!lim && (lim.min ? sp < lim.lim : sp > lim.lim));
+  $('hud-speed').classList.toggle('slowmode', !lim && slowHeld());
 }
 
 /* ---------- orientation hint (only very narrow phones) ---------- */
@@ -344,12 +391,30 @@ function tick(inp) {
   view.prev = { x: world.p.x, h: world.p.h, z: world.p.z };
   const wasPlay = world.status === 'play';
   step(world, inp, 1, (type, d) => {
-    A.sfx(type === 'die' && d?.cause === 'zap' ? 'zap' : type);
+    A.sfx(type === 'die' && (d?.cause === 'zap' || d?.cause === 'bump') ? 'zap' : type === 'call' ? 'ring' : type);
     view.event(type, d, world);
+    if (type === 'fakeclear') showFakeClear();
+    if (type === 'call') showCall(d);
   });
   if (wasPlay && world.status === 'dead') onDeath();
   if (wasPlay && world.status === 'clear') onClear();
 }
+
+// The level-clear card, for a finish that isn't one.
+function showFakeClear() {
+  $('clear-head').textContent = 'QUA MÀN!';
+  $('clear-msg').textContent = levelDeaths ? `Màn này chết ${levelDeaths} lần` : 'Không chết lần nào?! Giỏi quá ta...';
+  $('c-clear').classList.remove('hidden');
+  fakeAt = world.t;
+}
+function showCall(d) {
+  const c = CALLS[d.who] ?? { who: d.who, s: d.s };
+  $('call-who').textContent = c.who; $('call-msg').textContent = d.s ?? c.s;
+  $('call').classList.remove('hidden');
+  callUntil = world.t + (d.dur ?? 120);
+  if (S.settings.vibrate && navigator.vibrate) try { navigator.vibrate([80, 60, 80]); } catch (e) { /* ignore */ }
+}
+function hideCall() { $('call').classList.add('hidden'); callUntil = -1; fakeAt = -1; }
 
 function frame(now) {
   const dt = Math.min(100, now - last) / 16.667; last = now; t += dt;
@@ -359,13 +424,15 @@ function frame(now) {
   const kz = (keys.ArrowDown || keys.KeyS ? 1 : 0) - (keys.ArrowUp || keys.KeyW ? 1 : 0);
   let mx = kx + stick.x + (pad.x || 0), mz = kz + stick.y + (pad.y || 0);
   const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
-  const inp = { mx, mz };
+  const inp = { mx, mz, slow: slowHeld() || padSlow };
   if (mode === 'chapter') { chapterT += dt; if (chapterT > 110) endChapterSplash(); }
   if (mode === 'play' && !frozen) {
     acc += dt; let n = 0;
     while (acc >= 1 && n < 5) { tick({ ...inp, jump: jumpQueued }); jumpQueued = false; acc -= 1; n++; }
     if (n === 5) acc = 0;
-    if (world.status === 'dead' && world.deadT > 18 && !cardShown) showDeathCard();
+    if (fakeAt >= 0 && world.t - fakeAt > 52) { $('c-clear').classList.add('hidden'); fakeAt = -1; }
+    if (callUntil >= 0 && (world.t > callUntil || world.status !== 'play')) { $('call').classList.add('hidden'); callUntil = -1; }
+    if (world.status === 'dead' && world.deadT > 18 && !cardShown) { $('c-clear').classList.add('hidden'); fakeAt = -1; showDeathCard(); }
     if (world.status === 'clear' && world.clearT > 8 && !cardShown) showClearCard();
     if (world.status === 'clear' && world.clearT > 130) nextLevel();
   }
@@ -398,6 +465,6 @@ function loop(now) {
 // test / debug hook
 window.__thy = {
   get world() { return world; }, get mode() { return mode; }, get view() { return view; },
-  start: i => startLevel(i, false), keys, tick: (inp) => tick(inp),
+  start: i => startLevel(i, false), keys, tick: (inp) => tick(inp), retry: () => retry(),
   set frozen(v) { frozen = v; }
 };

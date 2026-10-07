@@ -2,7 +2,7 @@
 // Logic: x right, z toward the camera, h up. World: X = x, Y = h, Z = z (1:1).
 import * as THREE from 'three';
 import { T, tileAt, isSolidTile } from '../game/logic.js';
-import { part, box, cyl, M, textPlane, canvasTex, texMat, signTex } from './toon.js';
+import { part, box, cyl, ico, sph, M, textPlane, canvasTex, texMat, signTex } from './toon.js';
 import * as MD from './models.js';
 import { groundMat } from './world.js';
 
@@ -44,7 +44,7 @@ const CAR_COLORS = ['#e63946', '#f4d35e', '#2fa84f', '#f4f4f4', '#4d7cfe', '#8e4
 const V = {
   txt(e, ctx) {
     const s = e.s === '@controls'
-      ? (ctx.touch ? 'Cần gạt: chạy 8 hướng   ⤒ nhảy' : '←↑→↓ / WASD chạy   SPACE nhảy')
+      ? (ctx.touch ? 'Cần gạt: chạy   ⤒ nhảy   🐢 chạy chậm' : '←↑→↓ chạy · SPACE nhảy · giữ SHIFT chạy chậm')
       : e.s;
     const m = textPlane(s, e.size * 0.95, e.color);
     m.position.set(e.x, e.h, e.z);
@@ -53,12 +53,12 @@ const V = {
   },
 
   hole(e, ctx) {
-    const g = new THREE.Group();
-    let cover = null;
+    const root = new THREE.Group(), g = new THREE.Group(); root.add(g);
+    let cover = null, mat = null;
     if (e.hidden) {
       // looks exactly like the ground around it until it gives way
       const ch = tileAt(ctx.map, e.x + e.w / 2, e.z + e.d / 2);
-      const mat = ch === '=' ? groundMat('road', ctx.th) : ch === ',' ? M(ctx.th.rain ? '#4f6a3e' : '#6f9a4a') : groundMat('walk', ctx.th);
+      mat = ch === '=' ? groundMat('road', ctx.th) : ch === ',' ? M(ctx.th.rain ? '#4f6a3e' : '#6f9a4a') : groundMat('walk', ctx.th);
       cover = new THREE.Group();
       cover.add(part(box(e.w, 40, e.d), mat, { outline: false, receive: true, shadow: false, pos: [0, -20, 0] }));
       const crack = new THREE.Mesh(new THREE.PlaneGeometry(e.w * 0.8, e.d * 0.6), own(new THREE.MeshBasicMaterial({ map: cracks(), transparent: true, opacity: 0.35, depthWrite: false })));
@@ -70,14 +70,27 @@ const V = {
       cover.position.set(e.x + e.w / 2, 0, e.z + e.d / 2);
       g.add(cover);
     }
+    // a creeping hole: the ground is cut along its whole range, so fake ground fills the rest of the range
+    const fill = [];
+    if (e.chase && mat) for (let i = 0; i < 2; i++) { const f = part(box(1, 40, 1), mat, { outline: false, receive: true, shadow: false }); f.position.y = -20.5; root.add(f); fill.push(f); }
+    const span = (a, b, f) => {
+      const L = Math.max(0.01, b - a); f.visible = b - a > 0.5;
+      if (e.chase === 'x') { f.scale.set(L, 1, e.d); f.position.x = (a + b) / 2; f.position.z = e.z + e.d / 2; }
+      else { f.scale.set(e.w, 1, L); f.position.z = (a + b) / 2; f.position.x = e.x + e.w / 2; }
+    };
     if (e.sign) for (const [x, z] of [[e.x - 12, e.z + e.d * 0.25], [e.x - 12, e.z + e.d * 0.75], [e.x + e.w + 12, e.z + e.d * 0.25], [e.x + e.w + 12, e.z + e.d * 0.75]]) {
       if (isSolidTile(tileAt(ctx.map, x, z))) continue;
       const c = MD.makeCone(); c.position.set(x, 0, z); c.scale.setScalar(0.8); g.add(c);
     }
     let vy = 0, fallen = 0;
     return {
-      obj: g,
+      obj: root,
       update(e, w, t, dt) {
+        g.position.set(e.x - e.x0, 0, e.z - e.z0);
+        if (fill.length) {
+          const k = e.chase === 'x' ? 'x' : 'z', size = k === 'x' ? e.w : e.d;
+          span(e.lo, e[k], fill[0]); span(e[k] + size, e.hi + size, fill[1]);
+        }
         if (!cover || !e.open || fallen > 300) return;
         vy += 0.9 * dt; fallen += vy * dt;
         cover.position.y = -fallen; cover.rotation.z = Math.min(0.4, fallen * 0.004); cover.rotation.x = Math.min(0.3, fallen * 0.003);
@@ -208,6 +221,7 @@ const V = {
         const y = e.top + 40;
         if (e.stopped) return e.kind === 'bus' ? B('Hết giờ chạy!', e.cx, y, e.cz, 14) : B('Đỗ đây tí nha', e.cx, y, e.cz, 13);
         if (e.t < 70) {
+          if (e.say) return B(e.say, e.cx, y, e.cz, 14);
           if (e.kind === 'bike') return B(e.behind ? 'BÍÍP! TRÁNH!' : 'TRÁNH RA!', e.cx, y, e.cz, 15);
           if (e.kind === 'bus') return B('Lên xe không?', e.cx, y, e.cz, 14);
           if (e.kind === 'cart') return B('Bánh mì nóng giòn!', e.cx, y, e.cz, 14);
@@ -243,11 +257,16 @@ const V = {
       obj: g,
       update(e, w, t) {
         g.position.set(e.x, 0, e.z);
+        g.visible = !e.after || !!w.flags.fake;
+        if (e.after && w.flags.fake && !e.popped) { e.popped = t; }
+        if (e.popped) g.scale.setScalar(Math.min(1, (t - e.popped) / 12 + 0.05));
         a.g.position.y = e.moving ? 16 + Math.abs(Math.sin(t * 0.6)) * 6 : 0;
         pad.visible = !e.moving;
         legs.forEach((l, i) => { l.visible = e.moving; l.rotation.x = e.moving ? Math.sin(t * 0.6 + i * Math.PI) * 0.6 : 0; });
       },
-      bubble(e) {
+      bubble(e, w) {
+        if (e.after && !w.flags.fake) return;
+        if (e.after && w.flags.fake && !e.ran) return B('Đích thật ở đây nè 🙂', e.x, 190, e.z, 14);
         if (e.moving) return B('hehe 😜', e.x, 190, e.z, 15);
         if (e.ran) return B('ok ok, vào đi', e.x, 190, e.z, 14);
       }
@@ -353,15 +372,18 @@ const V = {
   speedcam(e, ctx) {
     const g = new THREE.Group();
     const [sx, sz] = besideRect(ctx.map, e, 20);
-    const s = MD.makeSpeedSign(); s.g.position.set(sx, 0, sz); s.g.scale.setScalar(0.7); g.add(s.g);
+    const s = MD.makeSpeedSign(e.kmh, e.min); s.g.position.set(sx, 0, sz); s.g.scale.setScalar(0.7); g.add(s.g);
     // painted zone markings
     for (const [x, z, w, d] of [[e.x + e.w / 2, e.z + 2, e.w, 4], [e.x + e.w / 2, e.z + e.d - 2, e.w, 4], [e.x + 2, e.z + e.d / 2, 4, e.d], [e.x + e.w - 2, e.z + e.d / 2, 4, e.d]])
       g.add(part(box(w, 1, d), '#ffd23f', { outline: false, shadow: false, pos: [x, 0.7, z] }));
-    const txt = textPlane('CHẬM', 18, '#ffd23f'); txt.rotation.x = -Math.PI / 2; txt.position.set(e.x + e.w / 2, 1, e.z + e.d / 2); g.add(txt);
+    const txt = textPlane(e.min ? `TỐI THIỂU ${e.kmh}` : `CHẬM · ${e.kmh}`, 18, e.min ? '#7cf29a' : '#ffd23f'); txt.rotation.x = -Math.PI / 2; txt.position.set(e.x + e.w / 2, 1, e.z + e.d / 2); g.add(txt);
     return {
       obj: g,
       update(e) { s.flash.material.opacity = Math.max(0, e.flash / 30); s.flash.scale.setScalar(1 + (30 - Math.max(0, e.flash)) / 15); },
-      bubble(e) { if (e.flash > 0) return B('📸 CHỤP!', sx, 200, sz, 16); }
+      bubble(e, w) {
+        if (e.flash > 0) return B(e.min ? '📸 Chậm quá! Phạt!' : '📸 CHỤP!', sx, 200, sz, 16);
+        if (!e.done && e.over > 0) return B(e.min ? 'NHANH LÊN!' : 'QUÁ TỐC ĐỘ!', sx, 200, sz, 15);
+      }
     };
   },
 
@@ -374,6 +396,152 @@ const V = {
         const bob = e.kind === 'boat' ? Math.sin(t * 0.08 + e.x0) * 1.5 : 0;
         m.position.set(e.x + shake, e.top - e.sink - (e.kind === 'boat' ? 20 : 0) + bob, e.z + e.d / 2);
         m.visible = e.sink < 200;
+      }
+    };
+  },
+
+  oil(e) {
+    const g = new THREE.Group();
+    const tex = canvasTex(128, 128, (c) => {
+      const gr = c.createRadialGradient(64, 64, 6, 64, 64, 62);
+      gr.addColorStop(0, 'rgba(40,30,60,.95)'); gr.addColorStop(0.55, 'rgba(70,40,110,.85)'); gr.addColorStop(0.75, 'rgba(40,120,140,.7)'); gr.addColorStop(1, 'rgba(20,20,20,0)');
+      c.fillStyle = gr; c.beginPath(); c.ellipse(64, 64, 62, 54, 0.4, 0, 7); c.fill();
+    });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(e.w + 14, e.d + 14), own(new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })));
+    m.rotation.x = -Math.PI / 2; m.position.set(e.x + e.w / 2, 0.7, e.z + e.d / 2); g.add(m);
+    // the barrel it came from
+    const b = part(cyl(13, 13, 34, 12), '#2f5d8a', { pos: [e.x + e.w + 6, 17, e.z - 4] }); b.rotation.z = Math.PI / 2; b.position.y = 13; g.add(b);
+    return {
+      obj: g,
+      bubble(e, w) { if (w.p.oil) return { s: 'TRƯỢTTT~', x: w.p.x, y: 120, z: w.p.z, size: 16, plain: true }; }
+    };
+  },
+
+  bump(e) {
+    const g = new THREE.Group(), { len, wid, rot } = along(e);
+    const fr = new THREE.Group(); fr.position.set(e.x + e.w / 2, 0, e.z + e.d / 2); fr.rotation.y = rot; g.add(fr);
+    const n = Math.max(4, Math.round(len / 20));
+    for (let i = 0; i < n; i++) fr.add(part(box(len / n, 7, Math.min(wid, 26)), i % 2 ? '#222' : '#ffd23f', { pos: [-len / 2 + (i + 0.5) * len / n, 3.5, 0], outline: i === 0, shadow: false }));
+    return {
+      obj: g,
+      bubble(e, w) {
+        if (e.hit > 0) return B('BOING!', w.p.x, w.p.h + 120, w.p.z, 16);
+        if (Math.hypot(w.p.x - e.x - e.w / 2, w.p.z - e.z - e.d / 2) < 240 && Math.hypot(w.p.vx, w.p.vz) > e.lim) return { s: `Gờ giảm tốc · ${e.kmh} km/h`, x: e.x + e.w / 2, y: 60, z: e.z + e.d / 2, size: 14, plain: true };
+      }
+    };
+  },
+
+  thrower(e) {
+    const g = new THREE.Group();
+    const H = e.hgt ?? 120;
+    // balcony slab + railing + the auntie
+    g.add(part(box(70, 8, 50), '#d9d2c3', { pos: [e.x, H - 4, e.z] }));
+    for (let i = 0; i < 5; i++) g.add(part(cyl(1.5, 1.5, 22, 5), '#555', { pos: [e.x - 30 + i * 15, H + 11, e.z + 22], outline: false }));
+    g.add(part(box(70, 3, 3), '#555', { pos: [e.x, H + 22, e.z + 22], outline: false }));
+    const gr = MD.makeGranny(); gr.g.position.set(e.x, H, e.z); gr.g.rotation.y = -Math.PI / 2; gr.g.scale.setScalar(0.9); g.add(gr.g);
+    const shots = new THREE.Group(); g.add(shots);
+    const proj = () => e.kind === 'water'
+      ? part(cyl(12, 9, 18, 10), '#4d7cfe', { pos: [0, 0, 0] })
+      : part(box(18, 4, 9), '#2a9df4', {});
+    const pool = [], marks = [];
+    for (let i = 0; i < 6; i++) {
+      const m = proj(); m.visible = false; shots.add(m); pool.push(m);
+      const mk = new THREE.Mesh(new THREE.RingGeometry(26, 36, 24), own(new THREE.MeshBasicMaterial({ color: '#ff3b3b', transparent: true, opacity: 0.6, depthWrite: false })));
+      mk.rotation.x = -Math.PI / 2; mk.visible = false; shots.add(mk); marks.push(mk);
+    }
+    return {
+      obj: g,
+      update(e, w, t) {
+        gr.arm.rotation.z = e.on ? Math.sin(t * 0.3) * 1.2 + 1 : 0;
+        pool.forEach((m, i) => {
+          const s = e.shots[i], mk = marks[i];
+          m.visible = !!s && !s.done; mk.visible = !!s && !s.done;
+          if (!s) return;
+          if (!s.done) {
+            const k = s.t / e.flight;
+            m.position.set(s.sx + (s.tx - s.sx) * k, H + 20 + Math.sin(k * Math.PI) * 120 - k * (H + 10), s.sz + (s.tz - s.sz) * k);
+            m.rotation.set(t * 0.3, t * 0.2, 0);
+            mk.position.set(s.tx, 1, s.tz); mk.scale.setScalar(1.3 - k * 0.5); mk.material.opacity = 0.3 + k * 0.5;
+          } else if (s.t < 50) {
+            m.visible = true; m.position.set(s.tx, 3, s.tz); m.rotation.set(0, 0, 0);
+          }
+        });
+      },
+      bubble(e, w, t) {
+        if (w.status === 'dead' && w.cause?.startsWith('thrower')) return B(e.kind === 'water' ? 'Tưới cây thôi mà!' : 'Trúng rồi! Hí hí', e.x, H + 120, e.z, 15);
+        if (e.on) return B(e.kind === 'water' ? 'Tạt nước nè!' : 'Chạy xe ồn quá!', e.x, H + 120, e.z, 14);
+      }
+    };
+  },
+
+  door(e) {
+    const g = new THREE.Group();
+    const piv = new THREE.Group(); piv.position.set(e.x, 0, e.z); g.add(piv);
+    const base = Math.atan2(-e.dz, e.dx);
+    let leaf, log = null, fist = null;
+    if (e.kind === 'branch') {
+      // a branch that shoots out of the trunk like a fist and pulls back in
+      leaf = new THREE.Group();
+      const lg = cyl(9, 12, 1, 8); lg.rotateZ(Math.PI / 2); lg.translate(0.5, 0, 0);
+      log = part(lg, '#7a5434', { outline: false }); leaf.add(log);
+      fist = new THREE.Group(); fist.add(part(ico(24), '#4fa34f')); fist.add(part(ico(15), '#3f8f3f', { pos: [-14, 14, 10] })); fist.add(part(sph(9, 8), '#7a5434', { pos: [12, -6, 0] })); leaf.add(fist);
+      leaf.position.y = 52;
+    } else {
+      leaf = part(box(e.len, 36, 6), e.color ?? '#e63946', {}); leaf.geometry.translate(e.len / 2, 0, 0); leaf.position.y = 30;
+      leaf.add(part(box(e.len * 0.55, 14, 7), '#a8d8f0', { pos: [e.len * 0.42, 9, 0], outline: false }));
+    }
+    piv.add(leaf);
+    // danger strip on the ground along the punch (telegraphs the wind-up)
+    let strip = null;
+    if (e.kind === 'branch') {
+      const sg = new THREE.PlaneGeometry(1, 30); sg.rotateX(-Math.PI / 2); sg.translate(0.5, 0, 0);
+      strip = new THREE.Mesh(sg, own(new THREE.MeshBasicMaterial({ color: '#ff3b3b', transparent: true, opacity: 0, depthWrite: false })));
+      strip.scale.x = e.len + 10; strip.position.y = 1; piv.add(strip);
+    }
+    return {
+      obj: g,
+      update(e, w, t) {
+        if (e.kind === 'branch') {
+          // folded along the trunk (pointing up) when idle, swings flat across the path when it punches
+          piv.rotation.set(0, base + (e.wind ? Math.sin(t * 2) * 0.12 : 0), 0);
+          const L = 14 + (e.len - 14) * e.a;
+          log.scale.x = L; fist.position.x = L;
+          strip.material.opacity = e.wind ? 0.25 + Math.abs(Math.sin(t * 0.5)) * 0.3 : e.a > 0 ? 0.45 : 0; fist.scale.setScalar(e.wind ? 1.15 + Math.sin(t * 1.3) * 0.1 : 1);
+        } else {
+          // door is closed along the car's side, swings out by up to 90 degrees
+          const cx = e.cx ?? -e.dz, cz = e.cz ?? e.dx, side = Math.atan2(-cz, cx);
+          piv.rotation.y = side + (base - side) * e.a;
+        }
+      },
+      bubble(e, w) {
+        if (e.kind === 'branch') { if (e.wind) return { s: 'xào xạc...', x: e.x, y: 130, z: e.z, size: 14, plain: true }; if (w.cause === 'branch' && w.status === 'dead') return B('BỐP!', e.x, 140, e.z, 16); return; }
+        if (e.st > 0 && e.a < 1) return B('Ủa có người hả?', e.x, 110, e.z, 14);
+      }
+    };
+  },
+
+  fakewin(e) {
+    const g = new THREE.Group();
+    const a = MD.makeArch(e.label ?? 'CÔNG TY', { h: 150, half: 56 }); a.g.rotation.y = Math.PI / 2; a.g.position.set(e.x, 0, e.z); g.add(a.g);
+    const pad = new THREE.Mesh(new THREE.PlaneGeometry(T - 12, T - 12), own(new THREE.MeshBasicMaterial({ map: checker() })));
+    pad.rotation.x = -Math.PI / 2; pad.position.set(e.x, 0.8, e.z); g.add(pad);
+    const obj = e.kind === 'safe' ? MD.makeAC() : MD.makeAC(); obj.scale.set(1.15, 1.6, 1.4); obj.visible = false; g.add(obj);
+    const blob = shadowBlob(); g.add(blob);
+    let flipped = false;
+    return {
+      obj: g,
+      update(e) {
+        if (e.st >= 2) {
+          obj.visible = true; obj.position.set(e.fx, e.y, e.fz);
+          const k = e.st === 2 ? Math.min(1, (360 - e.y) / 330) : 0;
+          blob.material.opacity = k * 0.55; blob.scale.setScalar(e.size * 0.7 * (0.4 + k)); blob.position.set(e.fx, 0.9, e.fz);
+        }
+        if (e.st === 3 && !flipped) { flipped = true; a.setLabel(e.flip ?? 'ĐÙA ĐÓ 😜'); pad.visible = false; }
+      },
+      bubble(e) {
+        if (e.st === 1) return B('Chúc mừng! 🎉', e.x, 190, e.z, 15);
+        if (e.st === 2) return B('...mà khoan', e.x, 190, e.z, 15);
+        if (e.st === 3) return B('Qua màn gì mà dễ vậy 😜', e.x, 190, e.z, 14);
       }
     };
   },

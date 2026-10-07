@@ -70,7 +70,9 @@ export class View {
 
   /* ---------- level setup ---------- */
   load(world, theme) {
-    const key = world.def.id + ':' + theme + ':' + this.quality;
+    // holes are cut into the baked ground, and which holes exist can change between attempts
+    const holes = world.ents.filter(e => e.k === 'hole').map(e => [e.x0 ?? e.x, e.z0 ?? e.z, e.w, e.d, e.chase ?? ''].join(',')).join(';');
+    const key = world.def.id + ':' + theme + ':' + this.quality + ':' + holes;
     if (key !== this.worldKey) {
       if (this.world) { this.scene.remove(this.world.root); this.world.dispose(); }
       this.world = buildWorld(world.def, world.ents, theme, world.map);
@@ -239,6 +241,12 @@ export class View {
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.clearRect(0, 0, this.W, this.H);
     if (this.flash > 0) { c.fillStyle = `rgba(255,255,255,${this.flash})`; c.fillRect(0, 0, this.W, this.H); }
+    // stand around too long and the game nags you
+    if (w.status === 'play' && w.idle > 300 && !this.attractMode) {
+      const NAG = ['Đứng đây chi? Trễ giờ rồi!', 'Sếp đang đếm từng phút đó...', 'Sợ hả? 🐔', 'Đi đi, bẫy không cắn đâu. (Có cắn.)'];
+      const [sx, sy] = this.toScreen(w.p.x, 110, w.p.z);
+      bubble(c, NAG[Math.floor(w.idle / 240) % NAG.length], sx, sy, 14 * s);
+    }
     for (const v of this.views) {
       const b = v.bubble?.(v.e, w, t);
       if (b) {

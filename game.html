@@ -37,6 +37,7 @@
 <div id="touch" class="hidden">
   <div id="stickzone" aria-label="Cần gạt"><div id="ring"><div id="knob"></div></div><span class="stick-hint">kéo để chạy</span></div>
   <div class="tb big" id="tj" aria-label="Nhảy">⤒</div>
+  <div class="tb slow" id="ts" aria-label="Chạy chậm">🐢</div>
 </div>
 
 <!-- title -->
@@ -54,7 +55,7 @@
     <button id="b-settings" class="btn">CÀI ĐẶT</button>
   </div>
   <p class="hint" id="title-hint"></p>
-  <p class="foot">v1.0 · <a href="#" id="b-credits">Giới thiệu</a></p>
+  <p class="foot">v2.0 · <a href="#" id="b-credits">Giới thiệu</a></p>
 </section>
 
 <!-- level select -->
@@ -84,7 +85,8 @@
   <div class="card text">
     <p><b>Traffic Hates You</b> là game "troll" về giao thông Sài Gòn. Mọi thứ trên đường đều ghét bạn: ổ gà, đèn đỏ, cột điện, chó, bà cụ, xe buýt, ô tô, cả cây xanh.</p>
     <p>Chết là chuyện bình thường. Mỗi lần chết đồng hồ chạy thêm 1 phút. Tới công ty trước 8:00 là thắng... chắc vậy.</p>
-    <p><b>Điều khiển:</b> ↑ / W chạy · ↓ / S phanh · ← → / A D lách trái phải · Space nhảy · R chơi lại · Esc tạm dừng. Điện thoại: kéo cần gạt bên trái để chạy và lách, nút bên phải để nhảy. Hỗ trợ tay cầm.</p>
+    <p><b>Điều khiển:</b> ←↑→↓ / WASD chạy 8 hướng (giữ lâu thì ga lên dần tới ~68 km/h, nhả ra là phanh) · giữ <b>Shift</b> để chạy chậm (~34 km/h) · Space nhảy · R chơi lại · Esc tạm dừng. Điện thoại: kéo cần gạt bên trái (kéo nhẹ = chạy chậm), ⤒ nhảy, 🐢 giữ để chạy chậm. Hỗ trợ tay cầm (A nhảy, B/LB/RB chạy chậm).</p>
+    <p><b>Mẹo:</b> chết một lần là nhớ... nhưng bẫy cũng nhớ bạn. Có bẫy chỉ xuất hiện lần đầu, có bẫy chỉ xuất hiện sau khi bạn chết.</p>
     <p class="dim">Mọi nhân vật và sự kiện là hư cấu. Hãy đội mũ bảo hiểm và tuân thủ luật giao thông ngoài đời thật nhé.</p>
   </div>
   <button class="btn back" data-back>← QUAY LẠI</button>
@@ -114,12 +116,14 @@
   <div class="head" id="dead-head">TOANG!</div>
   <div class="msg" id="dead-msg"></div>
   <div class="sub" id="dead-sub"></div>
+  <div class="sub taunt" id="dead-taunt"></div>
+  <button class="btn small hidden" id="dead-grab">🛵 GỌI GRAB</button>
   <div class="tap blink" id="dead-tap"></div>
 </section>
 
 <!-- clear card -->
 <section id="c-clear" class="card-ov clear hidden">
-  <div class="head ok">QUA MÀN!</div>
+  <div class="head ok" id="clear-head">QUA MÀN!</div>
   <div class="msg" id="clear-msg"></div>
 </section>
 
@@ -134,6 +138,9 @@
     <button id="e-menu" class="btn">VỀ MENU</button>
   </div>
 </section>
+
+<!-- fake incoming call / notification (troll, never blocks input) -->
+<div id="call" class="hidden"><div class="call-who" id="call-who"></div><div class="call-msg" id="call-msg"></div><div class="call-btns"><span class="no">✕</span><span class="yes">✆</span></div></div>
 
 <div id="rotate" class="hidden"><div>📱↻</div><p>Xoay ngang điện thoại để chơi nhé</p></div>
 <div id="toast" class="hidden"></div>

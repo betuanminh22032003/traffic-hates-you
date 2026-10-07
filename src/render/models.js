@@ -359,13 +359,14 @@ export function makeTireShop() {
   return g;
 }
 
-export function makeSpeedSign() {
+export function makeSpeedSign(kmh = 40, min = false) {
   const g = new THREE.Group();
   g.add(part(cyl(3, 3, 200, 8), '#9aa0a8', { pos: [0, 100, 0] }));
   const face = canvasTex(128, 128, (c) => {
     c.fillStyle = '#fff'; c.beginPath(); c.arc(64, 64, 60, 0, 7); c.fill();
-    c.strokeStyle = '#e63946'; c.lineWidth = 14; c.beginPath(); c.arc(64, 64, 52, 0, 7); c.stroke();
-    c.font = fontPx(54); c.fillStyle = '#111'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('40', 64, 68);
+    if (min) { c.fillStyle = '#1f6fd1'; c.beginPath(); c.arc(64, 64, 60, 0, 7); c.fill(); }
+    else { c.strokeStyle = '#e63946'; c.lineWidth = 14; c.beginPath(); c.arc(64, 64, 52, 0, 7); c.stroke(); }
+    c.font = fontPx(54); c.fillStyle = min ? '#fff' : '#111'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(kmh), 64, 68);
   });
   g.add(part(cyl(22, 22, 3, 24), '#ccc', { pos: [0, 150, 1], rot: [Math.PI / 2, 0, 0] }));
   const front = new THREE.Mesh(new THREE.CircleGeometry(22, 24), texMat(face)); front.position.set(0, 150, 3); g.add(front);

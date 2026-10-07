@@ -70,6 +70,10 @@ Kết nối repo, build command `npm run build`, publish directory `dist`. Khôn
 - [ ] Đổi phiên bản trong `package.json` và chữ `v1.0` ở màn hình tiêu đề (`game.html`).
 - [ ] Đổi tên cache trong `public/sw.js` (`thy-v1` → `thy-v2`...) mỗi lần phát hành bản mới để người chơi cũ nhận bản mới ngay.
 
+## Thiết kế
+
+Tài liệu thiết kế sản phẩm (vấn đề, nguyên tắc troll, cơ chế, danh sách màn): [`docs/DESIGN.md`](docs/DESIGN.md).
+
 ## Cấu trúc mã
 
 ```
@@ -85,7 +89,8 @@ src/render/models.js    mô hình (xe máy, chó, CSGT, bà cụ, xe buýt, ô t
 src/render/toon.js      vật liệu toon, viền, chữ vẽ bằng canvas
 src/audio.js            hiệu ứng âm thanh + nhạc nền tổng hợp
 src/save.js             lưu tiến trình và cài đặt (localStorage)
-scripts/smoke-test.mjs  bot tự chơi hết các màn (npm test)
+scripts/mechanics.mjs   kiểm tra cảm giác lái và các bẫy troll (npm test)
+scripts/smoke-test.mjs  bot tự chơi hết các màn, lần đầu và sau khi bẫy đổi (npm test)
 scripts/solutions.mjs   "đường đi" của bot cho từng màn
 scripts/make-icons.mjs  vẽ lại icon app (cần Playwright)
 public/                 manifest PWA, service worker, icon
@@ -108,8 +113,9 @@ Logic dùng tọa độ "pixel": mỗi ô bản đồ rộng `T = 80`; `x` sang 
    | ` ` (dấu cách) | kênh / hố (rơi là chết) |
    | `S` | chỗ xuất phát · `F` đích (ô sàn) |
 
-3. Bẫy đặt theo tọa độ ô (cột, hàng), `0.5` là giữa ô. Hàm có sẵn: `hole` (ổ gà, `hidden` = tàng hình), `dog`, `mover` (car/bike/bus/cart/truck chạy thẳng theo hướng `R L U D`; `every` lặp lại, `aim` nhắm vào bạn, `stay` đỗ lại chắn đường, `roof` đứng lên nóc được), `pole`/`tree` (đổ theo góc `ang`), `fall` (máy lạnh, chậu kiểng, thép rơi đúng chỗ bạn đứng), `manhole`, `nails`, `light`, `speedcam`, `gate`, `walker` (bà cụ), `finish` (`run` = đích bỏ chạy), `sign` (đích giả), `plat` (thúng, giàn giáo; `mx/mz` di chuyển, `fall` sập), `banner`, `block`, `car` (ô tô đỗ, nhảy lên nóc được), `txt`. Tham số `at: [c, r]` và `tr` đặt điểm kích hoạt và bán kính.
-4. Thêm lời giải cho bot vào `scripts/solutions.mjs` rồi chạy `npm test`. Gỡ lỗi một màn: `node scripts/dbg.mjs <id>` in ra từng sự kiện.
+3. Bẫy đặt theo tọa độ ô (cột, hàng), `0.5` là giữa ô. Hàm có sẵn: `hole` (ổ gà, `hidden` = tàng hình), `dog`, `mover` (car/bike/bus/cart/truck chạy thẳng theo hướng `R L U D`; `every` lặp lại, `aim` nhắm vào bạn, `stay` đỗ lại chắn đường, `roof` đứng lên nóc được), `pole`/`tree` (đổ theo góc `ang`), `fall` (máy lạnh, chậu kiểng, thép rơi đúng chỗ bạn đứng), `manhole`, `nails`, `light`, `speedcam`, `gate`, `walker` (bà cụ), `finish` (`run` = đích bỏ chạy), `sign` (đích giả), `plat` (thúng, giàn giáo; `mx/mz` di chuyển, `fall` sập), `banner`, `block`, `car` (ô tô đỗ, nhảy lên nóc được), `txt`, `oil` (vũng nhớt, mất lái), `bump` (gờ giảm tốc, `kmh`), `speedcam` (`kmh`, `min: true` = tốc độ tối thiểu), `thrower` (bà tầng 2 ném dép / tạt nước vào chỗ bạn sắp tới), `door` (cửa ô tô bật ra), `branch` (cành cây đấm theo chu kỳ), `fakewin` (đích giả; đích thật là `finish(..., { after: true })`), `call` (cuộc gọi troll che màn hình: `boss`, `mom`, `ex`, `bank`, `grab`). Tham số `at: [c, r]` và `tr` đặt điểm kích hoạt và bán kính.
+   Bẫy theo lượt: `first: true` chỉ có ở lần chơi đầu, `retry: true` chỉ có sau khi đã chết ít nhất một lần.
+4. Thêm lời giải cho bot vào `scripts/solutions.mjs` (một kịch bản, hoặc `{ 0: [...], 5: [...] }` nếu lần đầu và lần chơi lại khác nhau) rồi chạy `npm test`. Gỡ lỗi một màn: `node scripts/dbg.mjs <id>` in ra từng sự kiện.
 
 Số liệu vật lý tham khảo: tốc độ tối đa 4.4 px/khung (≈ 75 km/h trên đồng hồ), nhảy cao ≈ 84 px, nhảy xa ≈ 150 px (gần 2 ô) khi chạy hết tốc, nên hố rộng 1 ô nhảy qua được, hố 2 ô thì không; dây điện ở độ cao 250 px (bị nắp cống bắn lên là giật điện).
 

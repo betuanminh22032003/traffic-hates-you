@@ -63,6 +63,13 @@ const SFX = {
   scatter: () => { for (let i = 0; i < 8; i++) tone(2400 + i * 200, 2000, 0.04, 'triangle', 0.05, i * 0.03); },
   flash: () => { noise(0.05, 0.3, 0, 4000); tone(1200, 1200, 0.05, 'square', 0.06, 0.02); },
   door: () => { tone(220, 160, 0.12, 'square', 0.08); noise(0.1, 0.15, 0.05, 700); },
+  boing: () => { tone(160, 900, 0.35, 'square', 0.12); tone(900, 300, 0.25, 'triangle', 0.1, 0.3); },
+  throw: () => noise(0.25, 0.15, 0, 1600, sfxBus, 1.5),
+  splat: () => { noise(0.18, 0.35, 0, 500); tone(180, 60, 0.15, 'sine', 0.2); },
+  punch: () => { noise(0.07, 0.45, 0, 900); tone(140, 50, 0.18, 'square', 0.15); },
+  slip: () => tone(900, 200, 0.4, 'triangle', 0.1),
+  ring: () => { for (let i = 0; i < 4; i++) { tone(1320, 1320, 0.08, 'square', 0.06, i * 0.18); tone(990, 990, 0.08, 'square', 0.06, i * 0.18 + 0.09); } },
+  fakeclear: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.16, 'square', 0.09, i * 0.1)),
   click: () => tone(660, 990, 0.06, 'square', 0.06),
   pop: () => tone(520, 780, 0.08, 'triangle', 0.12)
 };
