@@ -53,6 +53,13 @@ const V = {
   },
 
   hole(e, ctx) {
+    if (e.alley) {
+      // alley potholes are not cut into the baked street: when one opens, a pit with dirt walls appears on top
+      const pit = new THREE.Group(); pit.position.set(e.x + e.w / 2, 0, e.z + e.d / 2); pit.visible = false;
+      pit.add(part(box(e.w - 4, 0.6, e.d - 4), '#140e0a', { outline: false, shadow: false, pos: [0, 0.4, 0] }));
+      pit.add(part(box(e.w - 4, 0.8, 12), '#5a4030', { outline: false, shadow: false, pos: [0, 0.6, -e.d / 2 + 8] }));
+      return { obj: pit, update(e) { pit.visible = e.open; } };
+    }
     const root = new THREE.Group(), g = new THREE.Group(); root.add(g);
     let cover = null, mat = null;
     if (e.hidden) {
@@ -222,10 +229,9 @@ const V = {
         if (e.stopped) return e.kind === 'bus' ? B('Hết giờ chạy!', e.cx, y, e.cz, 14) : B('Đỗ đây tí nha', e.cx, y, e.cz, 13);
         if (e.t < 70) {
           if (e.say) return B(e.say, e.cx, y, e.cz, 14);
-          if (e.kind === 'bike') return B(e.behind ? 'BÍÍP! TRÁNH!' : 'TRÁNH RA!', e.cx, y, e.cz, 15);
+          // traffic doesn't warn you any more; only the bus and the cart still talk
           if (e.kind === 'bus') return B('Lên xe không?', e.cx, y, e.cz, 14);
           if (e.kind === 'cart') return B('Bánh mì nóng giòn!', e.cx, y, e.cz, 14);
-          return B('BÍP BÍP!', e.cx, y, e.cz, 14);
         }
       }
     };
@@ -257,16 +263,16 @@ const V = {
       obj: g,
       update(e, w, t) {
         g.position.set(e.x, 0, e.z);
-        g.visible = !e.after || !!w.flags.fake;
-        if (e.after && w.flags.fake && !e.popped) { e.popped = t; }
+        g.visible = !e.after || !!w.flags['fake' + (e.zone ?? 0)];
+        if (e.after && w.flags['fake' + (e.zone ?? 0)] && !e.popped) { e.popped = t; }
         if (e.popped) g.scale.setScalar(Math.min(1, (t - e.popped) / 12 + 0.05));
         a.g.position.y = e.moving ? 16 + Math.abs(Math.sin(t * 0.6)) * 6 : 0;
         pad.visible = !e.moving;
         legs.forEach((l, i) => { l.visible = e.moving; l.rotation.x = e.moving ? Math.sin(t * 0.6 + i * Math.PI) * 0.6 : 0; });
       },
       bubble(e, w) {
-        if (e.after && !w.flags.fake) return;
-        if (e.after && w.flags.fake && !e.ran) return B('Đích thật ở đây nè 🙂', e.x, 190, e.z, 14);
+        if (e.after && !w.flags['fake' + (e.zone ?? 0)]) return;
+        if (e.after && w.flags['fake' + (e.zone ?? 0)] && !e.ran) return B('Đích thật ở đây nè 🙂', e.x, 190, e.z, 14);
         if (e.moving) return B('hehe 😜', e.x, 190, e.z, 15);
         if (e.ran) return B('ok ok, vào đi', e.x, 190, e.z, 14);
       }
@@ -561,6 +567,31 @@ const V = {
     }
     return { obj: g };
   }
+};
+
+// Checkpoint gate: a striped boom that lifts once the zone behind it is done, with the next zone's name.
+V.cpgate = (e) => {
+  const g = new THREE.Group(), cx = e.x + e.w / 2, cz = e.z + e.d / 2;
+  g.position.set(cx, 0, cz);
+  const across = new THREE.Group(); g.add(across);
+  if (e.dx) across.rotation.y = Math.PI / 2; // the boom spans the way out, across the direction you drive
+  across.add(part(box(14, 90, 14), '#2b2d42', { pos: [-e.w / 2 + 7, 45, 0] }));
+  across.add(part(box(14, 90, 14), '#2b2d42', { pos: [e.w / 2 - 7, 45, 0] }));
+  const boom = new THREE.Group(); boom.position.set(-e.w / 2 + 7, 60, 0); across.add(boom);
+  for (let i = 0; i < 4; i++) boom.add(part(box(e.w / 4, 12, 8), i % 2 ? '#fff' : '#e63946', { pos: [e.w / 8 + i * e.w / 4, 0, 0] }));
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(130, 32), texMat(signTex('🚩 ' + e.label, { w: 512, h: 128, bg: '#2a9d8f', size: 60 })));
+  sign.position.set(0, 112, 0); g.add(sign); // faces the camera whichever way the boom points
+  return {
+    obj: g,
+    update(e) { boom.rotation.z = e.a * 1.45; },
+    bubble(e) { return !e.open ? B('Qua hết đoạn này mới mở 🔒', cx, 150, cz, 13) : null; }
+  };
+};
+V.cpflag = (e) => {
+  const g = new THREE.Group(); g.position.set(e.x + 30, 0, e.z - 26);
+  g.add(part(cyl(3, 3, 110, 8), '#ddd', { pos: [0, 55, 0] }));
+  const flag = part(box(44, 26, 2), '#888', { pos: [22, 96, 0] }); g.add(flag);
+  return { obj: g, update(e, w, t) { flag.material = M(e.lit ? '#ffd23f' : '#888'); flag.rotation.y = Math.sin(t * 0.12) * 0.3; } };
 };
 
 export function makeEntityView(e, ctx) {

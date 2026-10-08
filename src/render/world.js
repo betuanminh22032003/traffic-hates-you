@@ -220,6 +220,13 @@ function buildGround(root, m, th, holes, treeTiles) {
       root.add(new THREE.Mesh(box(T, 10, T), canal ? canalMat() : pitMat()).translateX(x).translateY(canal ? -20 : -200).translateZ(z));
       continue;
     }
+    if (ch === 'X') {
+      // a street that runs off a zone ends at a row of barriers
+      root.add(part(groundBox(x, z, 256), groundMat('road', th), { pos: [x, -20, z], outline: false, receive: true, shadow: false }));
+      const vert = cell(m, c, r - 1) === '=' || cell(m, c, r + 1) === '=';
+      for (let k = -1; k <= 1; k++) root.add(part(box(vert ? 22 : 10, 30, vert ? 10 : 22), k ? '#ff7b25' : '#f5f5f5', { pos: [x + (vert ? k * 24 : 0), 15, z + (vert ? 0 : k * 24)] }));
+      continue;
+    }
     if (isSolidTile(ch) && ch !== 'T') { if (inside(m, c, r)) root.add(part(box(T, 220, T), '#3e2c1f', { pos: [x, -110, z], outline: false, shadow: false })); continue; }
     const kind = ch === '=' ? 'road' : ch === ',' || ch === 'T' ? 'grass' : 'walk';
     if (kind === 'grass') root.add(part(box(T, 40, T), grass, { pos: [x, -20, z], outline: false, receive: true, shadow: false }));
@@ -270,12 +277,12 @@ function planLots(m, seed) {
     for (const [a, b] of cells) taken.add(K(a, b));
     lots.push({ c, r, cw: horiz ? cells.length : 1, rh: horiz ? 1 : cells.length, front: fr, block: false });
   }
-  // the rest of each block: greedy rectangles (up to 3x3) sharing one roof
+  // the rest of each block: greedy rectangles (up to 2x2) sharing one roof
   for (let r = R0; r < R1; r++) for (let c = C0; c < C1; c++) {
     if (!free(c, r)) continue;
-    let cw = 1; while (cw < 3 && free(c + cw, r)) cw++;
+    let cw = 1; while (cw < 2 && free(c + cw, r)) cw++;
     let rh = 1;
-    grow: while (rh < 3) { for (let k = 0; k < cw; k++) if (!free(c + k, r + rh)) break grow; rh++; }
+    grow: while (rh < 2) { for (let k = 0; k < cw; k++) if (!free(c + k, r + rh)) break grow; rh++; }
     for (let b = r; b < r + rh; b++) for (let a = c; a < c + cw; a++) taken.add(K(a, b));
     lots.push({ c, r, cw, rh, front: false, block: true });
   }
@@ -320,10 +327,10 @@ function buildHouses(root, m, th, seed) {
     // houses on the camera side of a walkable tile stay low so they never hide the rider
     // blocks in front of the camera stay low; some blocks are little gardens full of trees
     const south = L.block && L.r >= m.H - 1;
-    if (L.block && L.cw * L.rh >= 2 && rnd(1) < (outside ? 0.45 : 0.3)) { garden(root, L, x, z, W, D, th, rnd, south); return; }
+    if (L.block && L.cw * L.rh >= 2 && rnd(1) < 0.42) { garden(root, L, x, z, W, D, th, rnd, south); return; }
     const h = L.front ? 44 + Math.floor(rnd(2) * 2) * 14
       : south ? 50 + Math.floor(rnd(2) * 2) * 16
-      : L.block ? (outside ? 110 : 80) + Math.floor(rnd(2) * 3) * 22
+      : L.block ? 60 + Math.floor(rnd(2) * 3) * 20
       : (outside ? 130 : 96) + Math.floor(rnd(2) * 4) * 26;
     const wall = th.houses[Math.floor(rnd(3) * th.houses.length)];
     const color = L.block ? '#' + new THREE.Color(wall).lerp(new THREE.Color('#ffffff'), 0.3).getHexString() : wall;
@@ -357,7 +364,7 @@ function buildHouses(root, m, th, seed) {
       return;
     }
     root.add(part(box(W + 4, 6, D + 4), color, { pos: [x, h + 3, z], outline: false }));
-    const area = L.cw * L.rh, items = L.block ? Math.min(4, Math.ceil(area / 4)) : 1;
+    const area = L.cw * L.rh, items = L.block ? Math.min(3, area) : 1;
     for (let i = 0; i < items; i++) {
       const ox = (rnd(40 + i) - 0.5) * (W - 50), oz = (rnd(50 + i) - 0.5) * (D - 50), pick = rnd(60 + i);
       if (pick < 0.4) { root.add(part(cyl(13, 13, 26, 12), '#3d7fd1', { pos: [x + ox, h + 13, z + oz] })); root.add(part(cyl(14, 14, 3, 12), '#e8e8e8', { pos: [x + ox, h + 27, z + oz], outline: false })); }
@@ -412,7 +419,7 @@ export function buildWorld(level, ents, theme, map) {
   const th = THEMES[theme];
   const seed = level.id * 31 + 7;
   // a creeping hole cuts the ground along its whole range (the view fills the rest with fake ground)
-  const holes = ents.filter(e => e.k === 'hole').map(h => !h.chase ? h
+  const holes = ents.filter(e => e.k === 'hole' && !e.alley).map(h => !h.chase ? h
     : h.chase === 'x' ? { x: h.lo, z: h.z0 ?? h.z, w: h.hi - h.lo + h.w, d: h.d } : { x: h.x0 ?? h.x, z: h.lo, w: h.w, d: h.hi - h.lo + h.d });
   const treeTiles = new Set(ents.filter(e => e.k === 'pole' && e.kind === 'tree').map(e => Math.floor(e.x / T) + ',' + Math.floor(e.z / T)));
   const raw = new THREE.Group();

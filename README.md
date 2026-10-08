@@ -1,12 +1,14 @@
 # Traffic Hates You – bản Sài Gòn 3D
 
-Game troll-platformer 3D góc nhìn cao 3/4 cố định (học theo Trees Hate You): chạy xe máy tới công ty trước 8:00 qua 15 màn. Mỗi màn là một khu phố Sài Gòn nhỏ dựng như mô hình (hẻm, ngã tư, chợ, công viên, công trình...), đường đi quanh co có ngã rẽ, bạn tự do chạy 8 hướng và nhảy. Thứ gì trên đường cũng ghét bạn: ổ gà tàng hình, đèn đỏ troll, cột điện đổ, chó không xích, bà cụ qua đường, xe buýt, ô tô mở cửa, đinh tặc, cục nóng máy lạnh rơi, cây đổ, triều cường, cổng công ty tự đóng... Chết là chuyện bình thường, mỗi lần chết đồng hồ chạy thêm 1 phút.
+Game troll-platformer 3D góc nhìn cao 3/4 cố định (học theo Trees Hate You): chạy xe máy tới công ty trước 8:00 qua 4 chương. Mỗi chương là **một bản đồ lớn liền mạch**: các khu phố Sài Gòn (hẻm, ngã tư, chợ, công viên, công trình...) nối với nhau bằng hẻm nhỏ, cuối mỗi khu có **cổng checkpoint**, chết thì quay lại checkpoint gần nhất. Bạn tự do chạy 8 hướng và nhảy. Thứ gì trên đường cũng ghét bạn: ổ gà tàng hình, đèn đỏ troll, cột điện đổ, chó không xích, bà cụ qua đường, xe buýt, ô tô mở cửa, đinh tặc, cục nóng máy lạnh rơi, cây đổ, triều cường, cổng công ty tự đóng... Chết là chuyện bình thường, mỗi lần chết đồng hồ chạy thêm 1 phút.
 
 ![Traffic Hates You](public/icons/og.png)
 
 ## Nội dung
 
-- **15 màn, 4 chương**: Hẻm Nhỏ (bình minh) · Đường Lớn (ban ngày) · Mưa Sài Gòn (mưa, đường trơn) · Tới Công Ty (Quận 1).
+- **4 chương, mỗi chương một bản đồ lớn** gồm 3–4 khu (15 khu tất cả): Hẻm Nhỏ (bình minh) · Đường Lớn (ban ngày) · Mưa Sài Gòn (mưa, đường trơn) · Tới Công Ty (Quận 1).
+- **Checkpoint**: về đích một khu là cổng sang hẻm kế tiếp mở ra; chết thì hồi sinh ngay sau cổng gần nhất.
+- **Hẻm nối giữa các khu đầy bẫy ngẫu nhiên, không báo trước**: ổ gà tàng hình, cây đổ cực nhanh, cục nóng/chậu cây rơi, xe máy ninja lao từ sau lưng. Mỗi lần chết bẫy được xếp lại.
 - **20 loại bẫy**, mỗi màn có 3–6 bẫy, chơi kiểu "chết một lần là nhớ".
 - Đồ họa 3D kiểu hoạt hình (toon shading, viền đen), phố nhà ống, bảng hiệu, dây điện, mưa, nước ngập.
 - Nhạc nền ngũ cung và hiệu ứng âm thanh đều được tổng hợp bằng Web Audio, không cần file âm thanh.
@@ -21,7 +23,7 @@ Game troll-platformer 3D góc nhìn cao 3/4 cố định (học theo Trees Hate 
 |---|---|---|---|
 | Chạy 8 hướng | ← ↑ → ↓ / W A S D | kéo cần gạt (càng kéo xa càng nhanh) | cần trái / D-pad |
 | Nhảy | Space (hoặc J, K) | nút ⤒ bên phải | A |
-| Chơi lại màn | R | menu tạm dừng | |
+| Chơi lại từ checkpoint | R | menu tạm dừng | |
 | Tạm dừng | Esc / P | ❚❚ | Start |
 
 ## Chạy trên máy
@@ -31,7 +33,7 @@ Cần Node.js 20 trở lên.
 ```bash
 npm install
 npm run dev        # mở http://localhost:5173/game.html
-npm test           # bot tự chơi 15 màn, xác nhận màn nào cũng qua được
+npm test           # bot tự chơi 15 khu + chạy qua mọi hẻm với 20 lần xếp bẫy ngẫu nhiên
 npm run build      # build vào dist/ và chép bản build ra thư mục gốc repo
 npm run preview    # chạy thử bản build
 ```
@@ -80,7 +82,8 @@ Tài liệu thiết kế sản phẩm (vấn đề, nguyên tắc troll, cơ ch�
 game.html               khung trang + các màn hình menu (mã nguồn; index.html ở gốc là bản build)
 src/main.js             vòng lặp game, luồng màn chơi, menu, input (phím, cảm ứng, tay cầm)
 src/game/logic.js       mô phỏng gameplay thuần (không DOM, không three.js, tất định)
-src/game/levels.js      dữ liệu 15 màn + 4 chương
+src/game/levels.js      dữ liệu 15 khu + 4 chương
+src/game/stages.js      ghép các khu của một chương thành một bản đồ lớn: hẻm nối, cổng checkpoint, bẫy ngẫu nhiên
 src/game/messages.js    câu thoại khi chết
 src/render/view.js      scene three.js, camera cao 3/4, người chơi, hạt, bong bóng thoại, cảnh báo xe ngoài màn hình
 src/render/world.js     dựng khu phố từ bản đồ ô: đường, vỉa hè, cỏ, kênh, hố, nhà ống, bảng hiệu, trời, mưa
@@ -90,7 +93,8 @@ src/render/toon.js      vật liệu toon, viền, chữ vẽ bằng canvas
 src/audio.js            hiệu ứng âm thanh + nhạc nền tổng hợp
 src/save.js             lưu tiến trình và cài đặt (localStorage)
 scripts/mechanics.mjs   kiểm tra cảm giác lái và các bẫy troll (npm test)
-scripts/smoke-test.mjs  bot tự chơi hết các màn, lần đầu và sau khi bẫy đổi (npm test)
+scripts/smoke-test.mjs  bot tự chơi hết các khu, lần đầu và sau khi bẫy đổi (npm test)
+scripts/stage-test.mjs  bản đồ chương: không có đường tắt qua checkpoint, hẻm nào cũng qua được (npm test)
 scripts/solutions.mjs   "đường đi" của bot cho từng màn
 scripts/make-icons.mjs  vẽ lại icon app (cần Playwright)
 public/                 manifest PWA, service worker, icon

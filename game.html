@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>Traffic Hates You</title>
-<meta name="description" content="Game troll-platformer 3D: chạy xe máy đi làm ở Sài Gòn trước 8:00. Ổ gà tàng hình, đèn đỏ troll, cột điện đổ, bà cụ qua đường... 15 màn, mỗi màn một kiểu ức chế.">
+<meta name="description" content="Game troll-platformer 3D: chạy xe máy đi làm ở Sài Gòn trước 8:00. Ổ gà tàng hình, đèn đỏ troll, cột điện đổ, bà cụ qua đường... 4 chương, mỗi chương một bản đồ lớn liền mạch có checkpoint.">
 <meta name="theme-color" content="#1b1612">
 <meta property="og:title" content="Traffic Hates You – bản Sài Gòn">
 <meta property="og:description" content="Đi làm đúng giờ thôi mà. Dễ! (Không dễ đâu.)">
@@ -51,7 +51,7 @@
   <div class="menu">
     <button id="b-play" class="btn primary">CHƠI</button>
     <button id="b-new" class="btn hidden">CHƠI LẠI TỪ ĐẦU</button>
-    <button id="b-select" class="btn">CHỌN MÀN</button>
+    <button id="b-select" class="btn">CHỌN CHƯƠNG</button>
     <button id="b-settings" class="btn">CÀI ĐẶT</button>
   </div>
   <p class="hint" id="title-hint"></p>
@@ -60,7 +60,7 @@
 
 <!-- level select -->
 <section id="s-select" class="screen hidden">
-  <h2>CHỌN MÀN</h2>
+  <h2>CHỌN CHƯƠNG</h2>
   <div id="chapters"></div>
   <button class="btn back" data-back>← QUAY LẠI</button>
 </section>
@@ -98,7 +98,7 @@
   <div class="menu">
     <button id="p-resume" class="btn primary">TIẾP TỤC</button>
     <button id="p-retry" class="btn">CHƠI LẠI MÀN</button>
-    <button id="p-select" class="btn">CHỌN MÀN</button>
+    <button id="p-select" class="btn">CHỌN CHƯƠNG</button>
     <button id="p-settings" class="btn">CÀI ĐẶT</button>
     <button id="p-menu" class="btn">VỀ MENU</button>
   </div>

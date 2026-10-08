@@ -71,7 +71,8 @@ export class View {
   /* ---------- level setup ---------- */
   load(world, theme) {
     // holes are cut into the baked ground, and which holes exist can change between attempts
-    const holes = world.ents.filter(e => e.k === 'hole').map(e => [e.x0 ?? e.x, e.z0 ?? e.z, e.w, e.d, e.chase ?? ''].join(',')).join(';');
+    // (so do the trees that are entities rather than scenery)
+    const holes = world.ents.filter(e => (e.k === 'hole' && !e.alley) || (e.k === 'pole' && e.kind === 'tree')).map(e => [e.k, e.x0 ?? e.x, e.z0 ?? e.z, e.w, e.d, e.chase ?? ''].join(',')).join(';');
     const key = world.def.id + ':' + theme + ':' + this.quality + ':' + holes;
     if (key !== this.worldKey) {
       if (this.world) { this.scene.remove(this.world.root); this.world.dispose(); }
@@ -252,19 +253,6 @@ export class View {
       if (b) {
         const [sx, sy, sz] = this.toScreen(b.x, b.y, b.z ?? 0);
         if (sz < 1 && sx > -100 && sx < this.W + 100) b.plain ? outlined(c, b.s, sx, sy, b.size * s) : bubble(c, b.s, sx, sy, b.size * s);
-      }
-      // traffic coming from off screen: warn at the screen edge where it will appear
-      const e = v.e;
-      if (v.mover && e.on && !e.stopped && w.status === 'play') {
-        const [sx, sy, sz] = this.toScreen(e.cx, 30, e.cz), m = 40 * s;
-        if (sz < 1 && (sx < 0 || sx > this.W || sy < 0 || sy > this.H) && Math.hypot(e.cx - w.p.x, e.cz - w.p.z) < 1500 && (t | 0) % 16 < 11) {
-          const ex = Math.max(m * 1.6, Math.min(this.W - m * 1.6, sx)), ey = Math.max(m * 1.6, Math.min(this.H - m * 1.6, sy));
-          const ang = Math.atan2(sy - ey, sx - ex);
-          c.save(); c.translate(ex + Math.cos(ang) * m * 0.9, ey + Math.sin(ang) * m * 0.9); c.rotate(ang);
-          c.beginPath(); c.moveTo(14 * s, 0); c.lineTo(-8 * s, -11 * s); c.lineTo(-8 * s, 11 * s); c.closePath();
-          c.fillStyle = '#ff5a5a'; c.strokeStyle = '#2a1f1a'; c.lineWidth = 3; c.fill(); c.stroke(); c.restore();
-          outlined(c, 'BÍÍP!', ex - Math.cos(ang) * m * 0.3, ey - Math.sin(ang) * m * 0.3, 20 * s, '#ff5a5a');
-        }
       }
     }
   }

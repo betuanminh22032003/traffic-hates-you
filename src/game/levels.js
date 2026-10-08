@@ -16,7 +16,7 @@ const dog = (c, r, o = {}) => ({ k: 'dog', x: P(c), z: P(r), ...opts(o) });
 const DIRS = { R: [1, 0], L: [-1, 0], D: [0, 1], U: [0, -1] };
 const mover = (kind, c, r, dir, o = {}) => ({ k: 'mover', kind, x: o.px ?? P(c), z: o.pz ?? P(r), dx: DIRS[dir][0], dz: DIRS[dir][1], ...opts(o) });
 const pole = (c, r, ang, o = {}) => ({ k: 'pole', x: P(c), z: P(r), ang, ...opts(o) });
-const tree = (c, r, ang, o = {}) => ({ k: 'pole', kind: 'tree', x: P(c), z: P(r), ang, len: 200, acc: 0.0035, wob: 16, ...opts(o) });
+const tree = (c, r, ang, o = {}) => ({ k: 'pole', kind: 'tree', x: P(c), z: P(r), ang, len: 200, acc: 0.008, wob: 5, ...opts(o) });
 const fall = (c, r, kind = 'ac', o = {}) => ({ k: 'fall', x: P(c), z: P(r), kind, ...opts(o) });
 const manhole = (c, r, o = {}) => ({ k: 'manhole', x: P(c), z: P(r), ...opts(o) });
 const nails = (c, r, cw = 1, rh = 1, o = {}) => ({ k: 'nails', x: E(c), z: E(r), w: cw * T, d: rh * T, tr: 90, ...opts(o) });
@@ -154,7 +154,7 @@ export const LEVELS = [
     txt(4, 1, 'Đường lớn rồi. An toàn hơn chứ?', { size: 18 }),
     mover('bike', 0, 0, 'L', { px: P(20), pz: P(1.5), aim: true, at: [4, 1.5], tr: 60, speed: 7 }),
     mover('bike', 0, 0, 'L', { px: P(20), pz: P(1.5), aim: true, at: [9, 1.5], tr: 60, speed: 8 }),
-    pole(13, 3, -Math.PI / 2 - 0.3, { at: [11, 1.5], tr: 60, len: 210, first: true }),
+    pole(13, 3, -Math.PI / 2 - 0.3, { at: [11, 1.5], tr: 60, len: 210, acc: 0.004, wob: 12, first: true }),
     // learned to wait for it? now it waits for you, and falls the other way
     pole(13, 3, -Math.PI / 2 + 0.35, { at: [12.6, 1.5], tr: 40, len: 210, wob: 4, retry: true }),
     mover('bike', 0, 0, 'D', { px: P(16), pz: P(-1), behind: true, aim: true, at: [16, 2.5], tr: 110, speed: 8 }),
