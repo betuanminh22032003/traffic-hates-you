@@ -70,3 +70,14 @@ Chó đã bỏ cuộc ("...thôi mệt") nằm yên và không cắn nữa. Bẫ
 
 - `scripts/mechanics.mjs`: kiểm tra cảm giác lái (lên cruise trong 10 khung, tối đa sau ~1 giây, nhả là dừng, Shift khóa tốc độ, bẻ lái ở tốc độ cao) và từng bẫy troll đều cắn được nhưng cũng đỡ được.
 - `scripts/smoke-test.mjs`: bot tự chơi 15 màn hai lần, ở lần chơi đầu (attempt 0) và sau khi bẫy đổi (attempt 5). Bot tự né dép, nhảy qua chó và xe máy.
+
+## 7. v3: bản đồ lớn liền mạch + checkpoint
+
+Phản hồi: "map phải nối tiếp nhau, map lớn, có checkpoint như game gốc; xe chạy qua không cần báo trước, bẫy random, cây đổ nhanh, mất dạy hơn".
+
+- **Mỗi chương là một bản đồ** (`src/game/stages.js`): các màn cũ thành *khu*, xếp trái sang phải, nối bằng hẻm. Đường hẻm được tìm tự động (Dijkstra, phạt rẽ) và không được chạm vào bất kỳ mặt đường nào khác của khu, nên không có đường tắt.
+- **Cổng checkpoint** ở mép khu, ngay cạnh đích thật: đóng cho tới khi về đích khu đó. Chết thì hồi sinh ngay sau cổng gần nhất; các khu đã qua chỉ giữ cảnh vật, không giữ bẫy đuổi theo.
+- **Bẫy hẻm ngẫu nhiên, không báo trước**, xếp lại sau mỗi lần chết (seed theo chương/khu/số lần chết nên mô phỏng vẫn tất định): ổ gà mở ngay trước bánh xe, cây ven hẻm đổ ngang (~15 khung hình), cục nóng/chậu cây rơi trúng chỗ đang đứng, xe máy ninja lao từ sau lưng (không còi, không bong bóng). Tối đa 2 xe ninja mỗi hẻm, bẫy cách nhau 3–5 ô.
+- **Xe cộ không còn cảnh báo**: bỏ mũi tên "BÍÍP!" ở mép màn hình, bỏ tiếng còi khi xe xuất hiện và bong bóng "TRÁNH RA!".
+- **Cây/cột điện đổ nhanh gấp đôi**, gần như không rung lắc báo trước.
+- Cách qua (bot trong `scripts/stage-test.mjs` chứng minh với 20 lần xếp bẫy cho mỗi hẻm): trời khô chạy nhanh để vượt ổ gà; ổ gà mở sát quá thì phanh, nhích tới mép rồi nhảy; cây đổ phía trước thì phanh, đổ xong nhảy qua thân cây; có gì rơi xuống thì đạp ga; xe ninja thì dừng lại và nhảy khi nó cách ~90 px. Trời mưa phanh yếu nên phải chạy chậm.

@@ -8,6 +8,7 @@ import './style.css';
 import './polyfills.js';
 import { makeWorld, step, KMH } from './game/logic.js';
 import { LEVELS, CHAPTERS } from './game/levels.js';
+import { STAGES } from './game/stages.js';
 import { deathText, HEAD, taunt, CALLS } from './game/messages.js';
 import { View } from './render/view.js';
 import * as A from './audio.js';
@@ -27,11 +28,14 @@ view.touch = isTouch;
 /* ---------- state ---------- */
 let mode = 'title';          // title | menu | chapter | play | pause | end
 let lvIdx = 0, world = null, levelDeaths = 0, cardShown = false, chapterT = 0;
+let attempts = [];           // deaths per zone of the current stage (re-rolls that zone's traps)
 let causeCount = {}, grabTried = false, fakeAt = -1, callUntil = -1;
 let attractWorld = null;
 let frozen = false;          // test hook: stop real-time stepping
 let returnTo = 's-title';    // where "back" from settings/select goes
-const theme = i => CHAPTERS[LEVELS[i].ch].theme;
+const theme = i => CHAPTERS[STAGES[i].ch].theme;
+// zones finished in earlier stages, for the clock
+const zonesBefore = i => STAGES.slice(0, i).reduce((n, s) => n + s.zones.length, 0);
 
 /* ---------- screens ---------- */
 const SCREENS = ['s-title', 's-select', 's-settings', 's-credits', 's-pause', 's-chapter', 's-end'];
@@ -47,7 +51,8 @@ function setHud(on) { $('hud').classList.toggle('hidden', !on); $('touch').class
 function toast(s) { const el = $('toast'); el.textContent = s; el.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.add('hidden'), 1800); }
 
 const runLevel = () => S.run.level ?? 0;
-const canContinue = () => runLevel() > 0 && runLevel() < LEVELS.length;
+const runCp = () => S.run.cp ?? 0;
+const canContinue = () => (runLevel() > 0 || runCp() > 0) && runLevel() < STAGES.length;
 
 function goTitle() {
   mode = 'title'; setHud(false); hideCards();
@@ -55,7 +60,7 @@ function goTitle() {
   view.attractMode = true;
   view.load(attractWorld, 'dawn');
   world = null;
-  $('b-play').textContent = canContinue() ? `TIẾP TỤC · MÀN ${runLevel() + 1}` : 'CHƠI';
+  $('b-play').textContent = canContinue() ? `TIẾP TỤC · CHƯƠNG ${runLevel() + 1}` : 'CHƠI';
   $('b-new').classList.toggle('hidden', !canContinue());
   $('title-hint').textContent = isTouch ? 'Cần gạt trái: chạy · ⤒ nhảy · 🐢 giữ để chạy chậm' : '←↑→↓ / WASD chạy · SPACE nhảy · giữ SHIFT chạy chậm · R chơi lại · ESC tạm dừng';
   show('s-title');
@@ -68,17 +73,15 @@ function buildSelect() {
     const box = document.createElement('div'); box.className = 'chap';
     box.innerHTML = `<h3>Chương ${ci + 1} · ${c.name}<small>${c.sub}</small></h3>`;
     const grid = document.createElement('div'); grid.className = 'lvls';
-    LEVELS.forEach((L, i) => {
-      if (L.ch !== ci) return;
-      const b = document.createElement('button');
-      const locked = L.id > S.unlocked, done = S.cleared[L.id];
-      b.className = 'lv' + (locked ? ' locked' : '') + (done ? ' done' : '');
-      b.innerHTML = locked ? `<b>🔒</b><span class="st">Màn ${L.id}</span>` :
-        `<b>${L.id}</b>${L.name}<span class="st">${done ? `💀 ít nhất ${S.best[L.id] ?? 0}` : 'chưa qua'}</span>`;
-      b.disabled = locked;
-      b.onclick = () => { A.sfx('click'); startLevel(i, true, true); };
-      grid.appendChild(b);
-    });
+    // one big map per chapter; its old levels are now zones with a checkpoint each
+    const st = STAGES[ci], locked = st.id > S.unlocked, done = S.cleared[st.id];
+    const b = document.createElement('button');
+    b.className = 'lv' + (locked ? ' locked' : '') + (done ? ' done' : '');
+    b.innerHTML = locked ? `<b>🔒</b><span class="st">Chương ${st.id}</span>` :
+      `<b>${st.id}</b>${st.zones.map(z => z.name).join(' → ')}<span class="st">${done ? `💀 ít nhất ${S.best[st.id] ?? 0}` : `${st.zones.length} checkpoint · chưa qua`}</span>`;
+    b.disabled = locked;
+    b.onclick = () => { A.sfx('click'); startLevel(ci, true, true); };
+    grid.appendChild(b);
     box.appendChild(grid); root.appendChild(box);
   });
 }
@@ -121,7 +124,7 @@ $('b-play').addEventListener('mouseenter', () => {
   A.sfx('hehe'); toast('Hụt 😜');
   setTimeout(() => { b.style.transform = ''; }, 1400);
 });
-$('b-play').onclick = () => { A.sfx('click'); if (canContinue()) startLevel(runLevel(), true); else newRun(); };
+$('b-play').onclick = () => { A.sfx('click'); if (canContinue()) startLevel(runLevel(), true, false, runCp()); else newRun(); };
 $('b-new').onclick = () => { A.sfx('click'); newRun(); };
 $('b-select').onclick = () => { A.sfx('click'); buildSelect(); returnTo = 's-title'; show('s-select'); };
 $('b-settings').onclick = () => { A.sfx('click'); refreshSettings(); returnTo = 's-title'; show('s-settings'); };
@@ -137,22 +140,23 @@ $('e-menu').onclick = () => { A.sfx('click'); goTitle(); };
 $('e-share').onclick = share;
 
 // A story run counts for the record only when it was played from level 1 in order.
-function newRun() { S.run = { deaths: 0, perLevel: {}, level: 0, full: true }; save(); startLevel(0, true); }
+function newRun() { S.run = { deaths: 0, perLevel: {}, level: 0, cp: 0, full: true }; save(); startLevel(0, true); }
 
 /* ---------- level flow ---------- */
-function startLevel(i, intro, fromSelect = false) {
+// A stage is a whole chapter in one map; cp = the checkpoint (zone) to start from.
+function startLevel(i, intro, fromSelect = false, cp = 0) {
   if (fromSelect && i !== runLevel()) S.run.full = false;
-  S.run.level = i; save();
-  const chapterStart = i === 0 || LEVELS[i - 1].ch !== LEVELS[i].ch;
+  S.run.level = i; S.run.cp = cp; save();
   lvIdx = i; levelDeaths = 0; jumpQueued = false; causeCount = {}; grabTried = false;
-  world = makeWorld(LEVELS[i], { attempt: 0 });
+  attempts = STAGES[i].zones.map(() => 0);
+  world = makeWorld(STAGES[i], { attempts, cp });
   view.attractMode = false;
   view.load(world, theme(i));
   hideCards(); hideCall(); setHud(true); updateHud(true);
-  A.playMusic(LEVELS[i].ch);
-  if (intro && chapterStart) {
-    const c = CHAPTERS[LEVELS[i].ch];
-    $('chap-no').textContent = `CHƯƠNG ${LEVELS[i].ch + 1}`; $('chap-name').textContent = c.name; $('chap-sub').textContent = c.sub;
+  A.playMusic(STAGES[i].ch);
+  if (intro) {
+    const c = CHAPTERS[STAGES[i].ch];
+    $('chap-no').textContent = `CHƯƠNG ${STAGES[i].ch + 1}`; $('chap-name').textContent = c.name; $('chap-sub').textContent = c.sub;
     show('s-chapter'); mode = 'chapter'; chapterT = 0;
   } else { show(null); mode = 'play'; }
 }
@@ -162,18 +166,22 @@ function endChapterSplash() {
   if (!document.hasFocus() || isPortraitBlocked()) pause(true);
 }
 
-// Every retry rebuilds the level for this attempt number: some traps only exist on the first try, some only after.
-function retry() {
-  world = makeWorld(LEVELS[lvIdx], { attempt: levelDeaths });
+// Every retry rebuilds the stage from the last checkpoint: that zone's traps change after a death, and the
+// alley traps are rolled again.
+function retry(cp = world.cp) {
+  levelDeaths = attempts[cp] ?? 0; grabTried = false;
+  world = makeWorld(STAGES[lvIdx], { attempts, cp });
   view.load(world, theme(lvIdx));
   hideCards(); hideCall(); mode = 'play'; show(null); jumpQueued = false;
 }
 
 function onDeath() {
-  levelDeaths++;
+  attempts[world.cp] = (attempts[world.cp] ?? 0) + 1;
+  levelDeaths = attempts[world.cp];
   causeCount[world.cause] = (causeCount[world.cause] || 0) + 1;
   S.totalDeaths++; S.run.deaths++;
-  S.run.perLevel[LEVELS[lvIdx].id] = (S.run.perLevel[LEVELS[lvIdx].id] || 0) + 1;
+  const zid = STAGES[lvIdx].zones[world.cp].level.id;
+  S.run.perLevel[zid] = (S.run.perLevel[zid] || 0) + 1;
   save();
   if (S.settings.vibrate && navigator.vibrate) try { navigator.vibrate(120); } catch (e) { /* ignore */ }
 }
@@ -186,33 +194,39 @@ function showDeathCard() {
   $('dead-taunt').textContent = taunt(levelDeaths);
   $('dead-tap').textContent = isTouch ? 'Chạm để thử lại' : 'Nhấn phím bất kỳ để thử lại';
   const grab = $('dead-grab');
-  grab.classList.toggle('hidden', levelDeaths < 6 || lvIdx >= LEVELS.length - 1);
-  grab.textContent = grabTried ? '🛵 GỌI GRAB LẠI (bỏ qua màn, +15 phút)' : '🛵 GỌI GRAB (bỏ qua màn)';
+  grab.classList.toggle('hidden', levelDeaths < 6 || (lvIdx >= STAGES.length - 1 && world.cp >= world.zones.length - 1));
+  grab.textContent = grabTried ? '🛵 GỌI GRAB LẠI (bỏ qua đoạn, +15 phút)' : '🛵 GỌI GRAB (bỏ qua đoạn)';
   $('c-dead').classList.remove('hidden');
   cardShown = true;
 }
 
+const stageDeaths = () => attempts.reduce((a, b) => a + b, 0);
 function onClear() {
-  const id = LEVELS[lvIdx].id;
+  const id = STAGES[lvIdx].id;
   S.cleared[id] = true;
-  S.best[id] = Math.min(S.best[id] ?? Infinity, levelDeaths);
+  S.best[id] = Math.min(S.best[id] ?? Infinity, stageDeaths());
   S.unlocked = Math.max(S.unlocked, id + 1);
-  S.run.level = lvIdx + 1;
+  S.run.level = lvIdx + 1; S.run.cp = 0;
   save();
 }
+function onCheckpoint(d) {
+  S.run.cp = d.zone; save();
+  toast(`🚩 CHECKPOINT · ${d.name}`);
+  updateHud(true);
+}
 function showClearCard() {
-  $('clear-head').textContent = 'QUA MÀN!';
-  $('clear-msg').textContent = levelDeaths ? `Màn này chết ${levelDeaths} lần` : 'Không chết lần nào?! Nghi lắm...';
+  $('clear-head').textContent = 'QUA CHƯƠNG!';
+  $('clear-msg').textContent = stageDeaths() ? `Chương này chết ${stageDeaths()} lần` : 'Không chết lần nào?! Nghi lắm...';
   $('c-clear').classList.remove('hidden');
   cardShown = true;
 }
 
 function nextLevel() {
-  if (lvIdx + 1 < LEVELS.length) startLevel(lvIdx + 1, true);
+  if (lvIdx + 1 < STAGES.length) startLevel(lvIdx + 1, true);
   else ending();
 }
 
-function clockMin() { return START_MIN + lvIdx * PER_LEVEL_MIN + S.run.deaths + (S.run.penalty || 0); }
+function clockMin() { return START_MIN + (zonesBefore(lvIdx) + (lvIdx < STAGES.length ? world?.cp ?? 0 : 0)) * PER_LEVEL_MIN + S.run.deaths + (S.run.penalty || 0); }
 
 // "Skip level" help that trolls you once: the first driver always cancels.
 $('dead-grab').addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -221,26 +235,27 @@ $('dead-grab').onclick = (e) => {
   if (!grabTried) {
     grabTried = true; S.run.penalty = (S.run.penalty || 0) + 1; save();
     A.sfx('ring'); toast('🛵 Tài xế đã hủy chuyến. Lý do: "thấy mặt khách" (+1 phút)');
-    $('dead-grab').textContent = '🛵 GỌI GRAB LẠI (bỏ qua màn, +15 phút)';
+    $('dead-grab').textContent = '🛵 GỌI GRAB LẠI (bỏ qua đoạn, +15 phút)';
     return;
   }
-  S.run.penalty = (S.run.penalty || 0) + 15; S.run.full = false;
-  S.unlocked = Math.max(S.unlocked, LEVELS[lvIdx].id + 1); S.run.level = lvIdx + 1; save();
-  toast('🛵 Grab chở qua màn. Phí: 15 phút + lòng tự trọng');
-  nextLevel();
+  S.run.penalty = (S.run.penalty || 0) + 15; S.run.full = false; save();
+  toast('🛵 Grab chở qua đoạn này. Phí: 15 phút + lòng tự trọng');
+  // drops you at the next checkpoint (or at the next chapter)
+  if (world.cp + 1 < world.zones.length) { S.run.cp = world.cp + 1; save(); retry(world.cp + 1); updateHud(true); }
+  else { onClear(); nextLevel(); }
 };
 const fmt = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 
 function ending() {
   mode = 'end'; setHud(false); hideCards();
-  lvIdx = LEVELS.length;
+  lvIdx = STAGES.length;
   const m = clockMin(), late = m - 8 * 60;
   const full = !!S.run.full;
   if (full) {
     S.finished++;
     if (S.bestRun == null || S.run.deaths < S.bestRun) S.bestRun = S.run.deaths;
   }
-  S.run.level = LEVELS.length;
+  S.run.level = STAGES.length; S.run.cp = 0;
   save();
   $('end-time').textContent = `Tới công ty lúc ${fmt(m)}!`;
   $('end-late').textContent = late > 0 ? `(trễ ${late} phút... bị trừ lương)` : 'Đúng giờ! Siêu nhân thật sự!';
@@ -357,8 +372,8 @@ function setText(id, s) { if (hudCache[id] !== s) { hudCache[id] = s; $(id).text
 function updateHud(force) {
   if (!world) return;
   if (force) for (const k in hudCache) delete hudCache[k];
-  const L = LEVELS[lvIdx];
-  setText('hud-level', `Màn ${L.id} · ${L.name}`);
+  const st = STAGES[lvIdx], zn = world.zones.length;
+  setText('hud-level', `Chương ${st.id} · ${st.zones[world.cp].name} ${world.cp + 1}/${zn}`);
   setText('hud-deaths', `💀 ${S.run.deaths}`);
   const m = clockMin();
   setText('hud-clock', `🕗 ${fmt(m)}`);
@@ -391,7 +406,8 @@ function tick(inp) {
   view.prev = { x: world.p.x, h: world.p.h, z: world.p.z };
   const wasPlay = world.status === 'play';
   step(world, inp, 1, (type, d) => {
-    A.sfx(type === 'die' && (d?.cause === 'zap' || d?.cause === 'bump') ? 'zap' : type === 'call' ? 'ring' : type);
+    A.sfx(type === 'die' && (d?.cause === 'zap' || d?.cause === 'bump') ? 'zap' : type === 'call' ? 'ring' : type === 'checkpoint' ? 'win' : type === 'gateopen' ? 'ding' : type === 'honk' ? null : type);
+    if (type === 'checkpoint') onCheckpoint(d);
     view.event(type, d, world);
     if (type === 'fakeclear') showFakeClear();
     if (type === 'call') showCall(d);

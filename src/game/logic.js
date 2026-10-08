@@ -22,7 +22,7 @@ const speedOf = p => Math.hypot(p.vx, p.vz);
 // '#' house, 'T' tree, 'K' kiosk/wall  -> solid
 // '=' road, '.' pavement, ',' grass, 'S' start, 'F' finish -> floor
 // '~' flood water (slow, the engine dies if you stay) ; ' ' canal / pit -> fall
-const SOLID = new Set(['#', 'T', 'K']);
+const SOLID = new Set(['#', 'T', 'K', 'X']); // X: road barrier at the end of a street
 export function parseMap(rows) {
   const H = rows.length, W = Math.max(...rows.map(r => r.length));
   const cells = rows.map(r => r.padEnd(W, '#').split(''));
@@ -134,7 +134,7 @@ export const KINDS = {
   // Electric pole or tree that topples. ang = direction it falls (radians, 0 = +x, PI/2 = toward the camera).
   pole: {
     init(e) {
-      e.a = 0; e.av = 0; e.st = 0; e.len ??= 220; e.acc ??= 0.004; e.wob ??= 12; e.kind ??= 'pole'; e.tr ??= 200;
+      e.a = 0; e.av = 0; e.st = 0; e.len ??= 220; e.acc ??= 0.007; e.wob ??= 5; e.kind ??= 'pole'; e.tr ??= 200;
       e.dx = Math.cos(e.ang); e.dz = Math.sin(e.ang);
     },
     update(w, e, dt, ev) {
@@ -305,7 +305,7 @@ export const KINDS = {
       if (e.st === 2) {
         e.vy += 0.6 * dt; e.y -= e.vy * dt;
         if (w.status === 'play' && Math.abs(p.x - e.fx) < e.size / 2 + PR - 4 && Math.abs(p.z - e.fz) < e.size / 2 + PR - 4 && e.y < p.h + PH) die(w, 'fakewin', ev);
-        if (e.y <= 0) { e.y = 0; e.st = 3; w.flags.fake = true; ev('thud', { x: e.fx, z: e.fz, big: true }); ev('hehe'); }
+        if (e.y <= 0) { e.y = 0; e.st = 3; w.flags['fake' + (e.zone ?? 0)] = w.flags.fake = true; ev('thud', { x: e.fx, z: e.fz, big: true }); ev('hehe'); }
       }
     },
     solids(e) { return e.st === 3 ? [{ x: e.fx - e.size / 2, z: e.fz - e.size / 2, w: e.size, d: e.size, top: 44 }] : []; }
@@ -352,14 +352,34 @@ export const KINDS = {
     init(e) { e.ran = false; e.moving = false; e.runR ??= 150; },
     update(w, e, dt, ev) {
       const p = w.p;
-      if (e.after && !w.flags.fake) return;
+      if (e.after && !w.flags['fake' + (e.zone ?? 0)]) return;
       if (e.rx != null && !e.ran && dist(p.x, p.z, e.x, e.z) < e.runR) { e.ran = true; e.moving = true; ev('hehe'); }
       if (e.moving) {
         const dx = e.rx - e.x, dz = e.rz - e.z, d = Math.hypot(dx, dz);
         if (d < 7 * dt) { e.x = e.rx; e.z = e.rz; e.moving = false; } else { e.x += dx / d * 7 * dt; e.z += dz / d * 7 * dt; }
       }
-      if (!e.moving && p.onGround && dist(p.x, p.z, e.x, e.z) < 36) win(w, ev);
+      if (!e.moving && p.onGround && dist(p.x, p.z, e.x, e.z) < 36) {
+        // in a big map every zone's finish is just a checkpoint; only the last one ends the stage
+        if (w.zones && e.zone < w.zones.length - 1) { if (w.cp <= e.zone) { w.cp = e.zone + 1; ev('checkpoint', { zone: w.cp, name: w.zones[w.cp].name, x: e.x, z: e.z }); } }
+        else win(w, ev);
+      }
     }
+  },
+
+  // Checkpoint gate between a zone and the alley to the next one: shut until that zone's finish is reached.
+  cpgate: {
+    init(e, w) { e.open = w.cp > e.zone; e.a = e.open ? 1 : 0; },
+    update(w, e, dt, ev) {
+      if (!e.open && w.cp > e.zone) { e.open = true; ev('gateopen', { x: e.x + e.w / 2, z: e.z + e.d / 2 }); }
+      if (e.open) e.a = Math.min(1, e.a + 0.05 * dt);
+    },
+    solids(e) { return e.a < 0.6 ? [{ x: e.x, z: e.z, w: e.w, d: e.d, top: 400 }] : []; }
+  },
+
+  // Checkpoint flag where you respawn (lit once reached).
+  cpflag: {
+    init(e, w) { e.lit = w.cp >= e.zone; },
+    update(w, e) { if (w.cp >= e.zone) e.lit = true; }
   },
 
   // A finish sign that is fake: flips its text when you get close (usually sits on a hidden hole).
@@ -399,7 +419,7 @@ export const KINDS = {
 function spawn(w, e, ev) {
   e.on = true; e.t = 0; e.travel = 0; e.cx = e.x; e.cz = e.z;
   if (e.aim) { if (e.dx) e.cz = w.p.z; else e.cx = w.p.x; }
-  ev('honk', { x: e.cx, z: e.cz, behind: e.behind });
+  if (!e.silent) ev('honk', { x: e.cx, z: e.cz, behind: e.behind });
 }
 function doorBox(e) {
   const L = e.len * e.a, th = e.kind === 'branch' ? 22 : 12;
@@ -421,14 +441,18 @@ function solidTileNear(w, x, z, r) {
 // attempt = how many times you already died on this level. Entities can exist only on some attempts:
 //   first: true -> only the very first try;  retry: true -> only after you died once (n: from the n-th retry).
 // That's the troll: the trap you just memorised moves.
+// A stage (a whole chapter as one map, see stages.js) has zones: attempts[zone] counts deaths per zone,
+// cp is the checkpoint (zone index) you start from.
 export const presentOn = (e, attempt) => (e.first ? attempt === 0 : true) && (e.retry ? attempt >= (e.n ?? 1) : true);
-export function makeWorld(def, { attempt = 0 } = {}) {
+export function makeWorld(def, { attempt = 0, attempts = null, cp = 0 } = {}) {
   const map = parseMap(def.map);
-  const ents = def.build().filter(e => presentOn(e, attempt));
+  const ents = def.build(attempts ?? [], cp).filter(e => presentOn(e, attempts ? attempts[e.zone ?? 0] ?? 0 : attempt));
+  const sp = def.zones?.[cp]?.spawn ?? { ...map.start, heading: Math.PI / 2 };
   const w = {
-    def, map, ents, attempt, flags: {}, t: 0, status: 'play', cause: null, deadT: 0, clearT: 0, rain: !!def.rain, idle: 0,
-    p: { x: map.start.x, z: map.start.z, h: 0, vx: 0, vz: 0, vh: 0, onGround: true, coy: 0, air: 0, jumpBuf: 0,
-      water: false, wt: 0, rideVx: 0, rideVz: 0, onEnt: null, onPlat: false, heading: Math.PI / 2, wheel: 0, spin: 0 }
+    def, map, ents, attempt, attempts, flags: {}, t: 0, status: 'play', cause: null, deadT: 0, clearT: 0, rain: !!def.rain, idle: 0,
+    zones: def.zones ?? null, cp,
+    p: { x: sp.x, z: sp.z, h: 0, vx: 0, vz: 0, vh: 0, onGround: true, coy: 0, air: 0, jumpBuf: 0,
+      water: false, wt: 0, rideVx: 0, rideVz: 0, onEnt: null, onPlat: false, heading: sp.heading, wheel: 0, spin: 0 }
   };
   for (const e of ents) KINDS[e.k]?.init?.(e, w);
   return w;
