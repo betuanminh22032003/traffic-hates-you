@@ -123,6 +123,12 @@ function uvBox(w, h, d, tile = 256) {
   for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, uv.getX(i) * dims[f][0] / tile, uv.getY(i) * dims[f][1] / tile); }
   return g;
 }
+// Ground box whose top face samples the texture in world space, so neighbouring tiles join without seams.
+function groundBox(x, z, tile) {
+  const g = uvBox(T, 40, T, tile), uv = g.attributes.uv, pos = g.attributes.position;
+  for (let i = 8; i < 12; i++) uv.setXY(i, (pos.getX(i) + x) / tile, -(pos.getZ(i) + z) / tile);
+  return g;
+}
 const groundMats = new Map();
 export function groundMat(kind, th) {
   const k = kind + th.road + th.walk + !!th.rain;
@@ -217,7 +223,12 @@ function buildGround(root, m, th, holes, treeTiles) {
     if (isSolidTile(ch) && ch !== 'T') { if (inside(m, c, r)) root.add(part(box(T, 220, T), '#3e2c1f', { pos: [x, -110, z], outline: false, shadow: false })); continue; }
     const kind = ch === '=' ? 'road' : ch === ',' || ch === 'T' ? 'grass' : 'walk';
     if (kind === 'grass') root.add(part(box(T, 40, T), grass, { pos: [x, -20, z], outline: false, receive: true, shadow: false }));
-    else root.add(part(uvBox(T, 40, T, kind === 'road' ? 256 : 96), groundMat(kind, th), { pos: [x, -20, z], outline: false, receive: true, shadow: false }));
+    else root.add(part(groundBox(x, z, kind === 'road' ? 256 : 96), groundMat(kind, th), { pos: [x, -20, z], outline: false, receive: true, shadow: false }));
+    // a continuous kerb wherever pavement or grass meets the road
+    if (kind !== 'road') for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (cell(m, c + dc, r + dr) !== '=' || holeAt(c + dc, r + dr)) continue;
+      root.add(part(box(dc ? 7 : T, 4, dc ? T : 7), '#d9d4cb', { pos: [x + dc * (T / 2 - 3.5), 2, z + dr * (T / 2 - 3.5)], outline: false, receive: true, shadow: false }));
+    }
     // dirt sides toward pits so holes have walls
     root.add(part(box(T, 180, T), '#3e2c1f', { pos: [x, -130, z], outline: false, shadow: false }));
     if (ch === '~') root.add(new THREE.Mesh(box(T, 4, T), waterMat()).translateX(x).translateY(5).translateZ(z));
@@ -232,51 +243,128 @@ function buildGround(root, m, th, holes, treeTiles) {
   }
 }
 
-// One tube house per '#' tile (plus a ring of them around the map). Low enough for the high camera.
+// Group the house tiles into buildings so the city reads as one continuous model instead of a grid of cubes:
+// tiles facing open ground become tube-house lots 1-3 tiles wide along the street, everything behind them
+// is merged into big block rectangles with one shared roofline.
+function planLots(m, seed) {
+  const C0 = -4, C1 = m.W + 4, R0 = -4, R1 = m.H + 4;
+  const isHouse = (c, r) => c >= C0 && c < C1 && r >= R0 && r < R1 && cell(m, c, r) === '#';
+  const open = (c, r) => !isSolidTile(cell(m, c, r));
+  const faceH = (c, r) => open(c, r - 1) || open(c, r + 1);
+  const faceV = (c, r) => open(c - 1, r) || open(c + 1, r);
+  const front = (c, r) => open(c, r - 1) || (open(c, r - 2) && r >= m.H);
+  const taken = new Set(), K = (c, r) => c + ',' + r, lots = [];
+  const free = (c, r) => isHouse(c, r) && !taken.has(K(c, r));
+  let n = 0;
+  // street frontage: lots run along the street they face
+  for (let r = R0; r < R1; r++) for (let c = C0; c < C1; c++) {
+    if (!free(c, r) || !(faceH(c, r) || faceV(c, r))) continue;
+    const horiz = faceH(c, r);
+    const want = 1 + Math.floor(hash(seed * 131 + n++ * 977) * 3), fr = front(c, r);
+    const cells = [[c, r]];
+    for (let k = 1; k < want; k++) {
+      const [nc, nr] = horiz ? [c + k, r] : [c, r + k];
+      if (!free(nc, nr) || (horiz ? !faceH(nc, nr) : !faceV(nc, nr) || faceH(nc, nr)) || front(nc, nr) !== fr) break;
+      cells.push([nc, nr]);
+    }
+    for (const [a, b] of cells) taken.add(K(a, b));
+    lots.push({ c, r, cw: horiz ? cells.length : 1, rh: horiz ? 1 : cells.length, front: fr, block: false });
+  }
+  // the rest of each block: greedy rectangles (up to 3x3) sharing one roof
+  for (let r = R0; r < R1; r++) for (let c = C0; c < C1; c++) {
+    if (!free(c, r)) continue;
+    let cw = 1; while (cw < 3 && free(c + cw, r)) cw++;
+    let rh = 1;
+    grow: while (rh < 3) { for (let k = 0; k < cw; k++) if (!free(c + k, r + rh)) break grow; rh++; }
+    for (let b = r; b < r + rh; b++) for (let a = c; a < c + cw; a++) taken.add(K(a, b));
+    lots.push({ c, r, cw, rh, front: false, block: true });
+  }
+  return lots;
+}
+
+// Simple gable roof: a triangular prism along x (w) with ridge height h over depth d.
+function gable(w, h, d) {
+  const s = new THREE.Shape([new THREE.Vector2(-d / 2, 0), new THREE.Vector2(d / 2, 0), new THREE.Vector2(0, h)]);
+  const g = new THREE.ExtrudeGeometry(s, { depth: w, bevelEnabled: false });
+  g.rotateY(Math.PI / 2); g.translate(-w / 2, 0, 0);
+  return g;
+}
+
+// A walled garden block: low wall, grass, a few trees. Keeps the city green and soft around the edges.
+function garden(root, L, x, z, W, D, th, rnd, low) {
+  root.add(part(box(W, 16, D), th.walk, { pos: [x, 8, z], t: 1.2 }));
+  root.add(part(box(W - 12, 2, D - 12), th.rain ? '#4f6a3e' : '#6f9a4a', { pos: [x, 17, z], outline: false, shadow: false }));
+  const n = Math.min(6, Math.max(1, Math.round(L.cw * L.rh / 2)));
+  for (let i = 0; i < n; i++) {
+    const t = makeTree(140 + rnd(70 + i) * 70);
+    t.position.set(x + (rnd(80 + i) - 0.5) * (W - 60), 16, z + (rnd(90 + i) - 0.5) * (D - 60));
+    t.rotation.y = rnd(100 + i) * 6.28; t.scale.setScalar((low ? 0.45 : 0.7) + rnd(110 + i) * 0.25);
+    root.add(t);
+  }
+}
+
 function buildHouses(root, m, th, seed) {
   const T_ = textures();
-  for (let r = -4; r < m.H + 4; r++) for (let c = -4; c < m.W + 4; c++) {
-    const ch = cell(m, c, r);
-    if (ch !== '#' && ch !== 'K') continue;
-    const x = c * T + T / 2, z = r * T + T / 2, rnd = k => hash(seed * 977 + (c + 7) * 131 + (r + 7) * 7919 + k * 17);
-    if (ch === 'K') {
-      // market stall / kiosk
-      root.add(part(box(T - 10, 46, T - 10), '#8d6e63', { pos: [x, 23, z] }));
-      root.add(part(box(T, 6, T), ['#e63946', '#2a9d8f', '#f4a300', '#1d6fd8'][Math.floor(rnd(1) * 4)], { pos: [x, 52, z], rot: [0.12, 0, 0] }));
-      continue;
-    }
-    const outside = !inside(m, c, r);
-    // houses on the camera side of a walkable tile are kept low so they never hide the rider
-    const open = ch2 => !isSolidTile(ch2);
-    const front = open(cell(m, c, r - 1)) || open(cell(m, c, r - 2)) && r >= m.H;
-    const h = front ? 44 + Math.floor(rnd(2) * 2) * 14 : (outside ? 130 : 96) + Math.floor(rnd(2) * 4) * 26;
-    const color = th.houses[Math.floor(rnd(3) * th.houses.length)];
-    const fm = facadeMat(T_.facade[Math.floor(rnd(5) * 2)], color);
-    root.add(part(box(T, h, T), color, { pos: [x, h / 2, z], t: 1.6 }));
+  for (let r = 0; r < m.H; r++) for (let c = 0; c < m.W; c++) {
+    if (m.cells[r][c] !== 'K') continue;
+    // market stall / kiosk
+    const x = c * T + T / 2, z = r * T + T / 2, k = hash(seed * 977 + c * 131 + r * 7919);
+    root.add(part(box(T - 10, 46, T - 10), '#8d6e63', { pos: [x, 23, z] }));
+    root.add(part(box(T, 6, T), ['#e63946', '#2a9d8f', '#f4a300', '#1d6fd8'][Math.floor(k * 4)], { pos: [x, 52, z], rot: [0.12, 0, 0] }));
+  }
+  const ROOF = ['#c8553d', '#b5482f', '#d9784a', '#8f4a3a'];
+  planLots(m, seed).forEach((L, li) => {
+    const rnd = k => hash(seed * 977 + (L.c + 7) * 131 + (L.r + 7) * 7919 + k * 17);
+    const W = L.cw * T, D = L.rh * T, x = L.c * T + W / 2, z = L.r * T + D / 2;
+    const outside = !inside(m, L.c, L.r);
+    // houses on the camera side of a walkable tile stay low so they never hide the rider
+    // blocks in front of the camera stay low; some blocks are little gardens full of trees
+    const south = L.block && L.r >= m.H - 1;
+    if (L.block && L.cw * L.rh >= 2 && rnd(1) < (outside ? 0.45 : 0.3)) { garden(root, L, x, z, W, D, th, rnd, south); return; }
+    const h = L.front ? 44 + Math.floor(rnd(2) * 2) * 14
+      : south ? 50 + Math.floor(rnd(2) * 2) * 16
+      : L.block ? (outside ? 110 : 80) + Math.floor(rnd(2) * 3) * 22
+      : (outside ? 130 : 96) + Math.floor(rnd(2) * 4) * 26;
+    const wall = th.houses[Math.floor(rnd(3) * th.houses.length)];
+    const color = L.block ? '#' + new THREE.Color(wall).lerp(new THREE.Color('#ffffff'), 0.3).getHexString() : wall;
+    root.add(part(box(W, h, D), wall, { pos: [x, h / 2, z], t: 1.6 }));
+    const fm = facadeMat(T_.facade[Math.floor(rnd(5) * 2)], wall);
     const floors = Math.max(0, Math.floor((h - 60) / 48));
-    // facades on every side that faces open ground
+    // facades on each tile edge of the lot that faces open ground
     const sides = [[0, 1, 0], [0, -1, Math.PI], [1, 0, Math.PI / 2], [-1, 0, -Math.PI / 2]];
-    for (const [dc, dr, rot] of sides) {
+    for (let r = L.r; r < L.r + L.rh; r++) for (let c = L.c; c < L.c + L.cw; c++) for (const [dc, dr, rot] of sides) {
       const n = cell(m, c + dc, r + dr);
       if (!isFloor(n) && n !== ' ') continue;
-      const g = new THREE.Group(); g.position.set(x + dc * (T / 2 + 0.6), 0, z + dr * (T / 2 + 0.6)); g.rotation.y = rot;
+      const tx = c * T + T / 2, tz = r * T + T / 2, u = k => rnd(k + (c - L.c) * 5 + (r - L.r) * 7);
+      const g = new THREE.Group(); g.position.set(tx + dc * (T / 2 + 0.6), 0, tz + dr * (T / 2 + 0.6)); g.rotation.y = rot;
       if (floors) { const fp = facePlane(T - 8, floors * 48, fm, 1, floors * 0.75); fp.position.set(0, 60 + floors * 24, 0); g.add(fp); }
-      if (front && dr === -1) { root.add(g); continue; } // low wall: keep the side the camera sees through plain
-      const shopFront = isFloor(n) && rnd(6 + dc + dr * 3) < 0.7;
+      if (L.front && dr === -1) { root.add(g); continue; } // low wall: keep the side the camera sees through plain
+      const shopFront = isFloor(n) && u(6 + dc + dr * 3) < 0.7;
       const gp = facePlane(T - 12, 46, shopFront ? shopMat() : shutterMat()); gp.position.set(0, 24, 0); g.add(gp);
-      if (shopFront && rnd(9 + dc) < 0.8) {
-        const idx = Math.floor(rnd(8 + dr) * SIGNS.length), ns = SIGNS.length;
+      if (shopFront && u(9 + dc) < 0.8) {
+        const idx = Math.floor(u(8 + dr) * SIGNS.length), ns = SIGNS.length;
         const sp = facePlane(T - 8, 18, atlasMat(), 1, 1, 1 - (idx + 1) / ns, 1 - idx / ns); sp.position.set(0, 56, 4); g.add(sp);
-        if (rnd(11 + dc) < 0.55) g.add(part(box(T - 6, 3, 30), ['#e63946', '#2a9d8f', '#f4a300', '#1d6fd8'][Math.floor(rnd(12) * 4)], { pos: [0, 47, 15], rot: [0.3, 0, 0] }));
+        if (u(11 + dc) < 0.55) g.add(part(box(T - 6, 3, 30), ['#e63946', '#2a9d8f', '#f4a300', '#1d6fd8'][Math.floor(u(12) * 4)], { pos: [0, 47, 15], rot: [0.3, 0, 0] }));
       }
       root.add(g);
     }
-    // rooftop clutter: water tank, AC units, plants
-    if (rnd(20) < 0.55) { root.add(part(cyl(13, 13, 26, 12), '#3d7fd1', { pos: [x - 16, h + 13, z - 14] })); root.add(part(cyl(14, 14, 3, 12), '#e8e8e8', { pos: [x - 16, h + 27, z - 14], outline: false })); }
-    if (rnd(21) < 0.5) root.add(part(box(22, 14, 14), '#e8ecef', { pos: [x + 18, h + 7, z + 16] }));
-    if (rnd(22) < 0.35) root.add(part(ico(10, 0), '#4fa34f', { pos: [x + 20, h + 10, z - 20] }));
-    root.add(part(box(T + 4, 6, T + 4), color, { pos: [x, h + 3, z], outline: false }));
-  }
+    // one roof per building: a tiled gable on some street lots, a flat terrace with clutter on the rest
+    if (!L.block && !L.front && rnd(30) < 0.35) {
+      const along = L.cw >= L.rh, gw = (along ? W : D) + 6, gd = (along ? D : W) + 10;
+      const roof = part(gable(gw, Math.min(32, gd * 0.36), gd), ROOF[Math.floor(rnd(31) * ROOF.length)], { pos: [x, h, z] });
+      if (!along) roof.rotation.y = Math.PI / 2;
+      root.add(roof);
+      return;
+    }
+    root.add(part(box(W + 4, 6, D + 4), color, { pos: [x, h + 3, z], outline: false }));
+    const area = L.cw * L.rh, items = L.block ? Math.min(4, Math.ceil(area / 4)) : 1;
+    for (let i = 0; i < items; i++) {
+      const ox = (rnd(40 + i) - 0.5) * (W - 50), oz = (rnd(50 + i) - 0.5) * (D - 50), pick = rnd(60 + i);
+      if (pick < 0.4) { root.add(part(cyl(13, 13, 26, 12), '#3d7fd1', { pos: [x + ox, h + 13, z + oz] })); root.add(part(cyl(14, 14, 3, 12), '#e8e8e8', { pos: [x + ox, h + 27, z + oz], outline: false })); }
+      else if (pick < 0.7) root.add(part(box(22, 14, 14), '#e8ecef', { pos: [x + ox, h + 7, z + oz] }));
+      else if (pick < 0.9) root.add(part(ico(12, 0), '#4fa34f', { pos: [x + ox, h + 11, z + oz] }));
+    }
+  });
 }
 
 function buildProps(root, m, th, seed) {
