@@ -34,7 +34,7 @@ export const DEATH = {
 export const TAUNT = [
   [3, 'Gợi ý: đừng chết nữa.'],
   [5, 'Bạn có chắc là biết chạy xe không?'],
-  [8, 'Mẹ gọi: "Con ơi, đi Grab đi."'],
+  [8, 'Mẹ gọi: "Con ơi, gọi xe ôm đi."'],
   [12, 'Ổ gà cũng bắt đầu thấy tội cho bạn.'],
   [20, 'Kỷ lục mới! (theo chiều ngược lại)']
 ];
@@ -46,7 +46,7 @@ export const CALLS = {
   mom: { who: '📞 MẸ', s: '"Nhớ mua ổ bánh mì cho mẹ."' },
   ex: { who: '💬 NGƯỜI YÊU CŨ', s: '"Anh còn nhớ em không?"' },
   bank: { who: '💳 NGÂN HÀNG', s: '"Tài khoản -2.000.000đ: phạt nguội"' },
-  grab: { who: '🛵 GRAB', s: '"Tài xế đã hủy chuyến. Lý do: kẹt xe"' }
+  ride: { who: '🛵 XE ÔM CÔNG NGHỆ', s: '"Tài xế đã hủy chuyến. Lý do: kẹt xe"' }
 };
 
 export const HEAD = ['TOANG!', 'CHỊU!', 'ÔI THÔI XONG', 'ẢO THẬT ĐẤY', 'TRỄ LÀM RỒI', 'CẠN LỜI', 'HẾT CỨU', 'TỨC GHÊ', 'GÀ QUÁ', 'LẠI NỮA À?'];

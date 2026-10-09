@@ -12,7 +12,7 @@ const DEFAULT = {
   run: { deaths: 0, perLevel: {}, level: 0, cp: 0, full: true, att: null }, // current story run (level = stage index, cp = checkpoint) (resets on "Chơi mới")
   finished: 0,          // number of times the game was beaten
   bestRun: null,        // fewest deaths for a full run
-  settings: { music: true, sfx: true, quality: 'auto', vibrate: true }
+  settings: { music: true, sfx: true, quality: 'auto', vibrate: true, lang: null } // lang null = follow the browser
 };
 
 let data = load();

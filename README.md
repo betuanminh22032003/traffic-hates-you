@@ -15,7 +15,8 @@ Game troll-platformer 3D góc nhìn cao 3/4 cố định (học theo Trees Hate 
 - Lưu tiến trình (màn đã mở, số lần chết ít nhất mỗi màn, kỷ lục cả lượt).
 - Chơi được bằng bàn phím, cảm ứng (điện thoại, máy tính bảng) và tay cầm.
 - Cài được như app (PWA) và chơi offline.
-- Cài đặt: nhạc, âm thanh, rung, chất lượng đồ họa (Tự động/Cao/Vừa/Thấp), toàn màn hình, xóa tiến trình.
+- Hai ngôn ngữ: tiếng Việt và tiếng Anh, tự chọn theo trình duyệt (máy tiếng Việt thì tiếng Việt, còn lại tiếng Anh), đổi được trong Cài đặt.
+- Cài đặt: ngôn ngữ, nhạc, âm thanh, rung, chất lượng đồ họa (Tự động/Cao/Vừa/Thấp), toàn màn hình, xóa tiến trình.
 
 ## Điều khiển
 
@@ -69,7 +70,7 @@ Kết nối repo, build command `npm run build`, publish directory `dist`. Khôn
 - [ ] `npm test` báo `Every chapter map is sealed by its checkpoints and every alley is passable.` (và các khu đều `ok`).
 - [ ] `npm run build` không lỗi, `npm run preview` chơi thử được chương 1; tắt mạng rồi tải lại trang vẫn chơi được.
 - [ ] Đổi link/ảnh chia sẻ nếu đăng ở chỗ khác GitHub Pages: thẻ `og:url`, `og:image` trong `game.html` phải là link tuyệt đối; ảnh ở `public/icons/og.png` (1200 × 630).
-- [ ] Đổi phiên bản trong `package.json` và chữ `v3.0` ở màn hình tiêu đề (`game.html`).
+- [ ] Đổi phiên bản trong `package.json` và chữ `v3.1` ở màn hình tiêu đề (`game.html`).
 - [ ] Không cần đổi tên cache: mỗi lần build, `sw.js` tự nhận mã phiên bản mới và danh sách file cần lưu offline.
 - [ ] Đổi cấu trúc màn/chương thì tăng khóa lưu trong `src/save.js` (`traffic-hates-you:v2` → `v3`) để save cũ không trỏ sai chỗ.
 
@@ -93,9 +94,12 @@ src/render/models.js    mô hình (xe máy, chó, CSGT, bà cụ, xe buýt, ô t
 src/render/toon.js      vật liệu toon, viền, chữ vẽ bằng canvas
 src/audio.js            hiệu ứng âm thanh + nhạc nền tổng hợp
 src/save.js             lưu tiến trình và cài đặt (localStorage)
+src/i18n.js             đổi ngôn ngữ: tr() tra câu tiếng Việt trong từ điển, số trong câu là ký tự đại diện {n}
+src/lang/en.js          từ điển tiếng Anh (khóa là câu tiếng Việt y như trong game)
 scripts/mechanics.mjs   kiểm tra cảm giác lái và các bẫy troll (npm test)
 scripts/smoke-test.mjs  bot tự chơi hết các khu, lần đầu và sau khi bẫy đổi (npm test)
 scripts/stage-test.mjs  bản đồ chương: không có đường tắt qua checkpoint, hẻm nào cũng qua được (npm test)
+scripts/i18n-test.mjs   mọi câu tiếng Việt người chơi thấy đều có bản tiếng Anh (npm test)
 scripts/solutions.mjs   "đường đi" của bot cho từng màn
 scripts/make-icons.mjs  vẽ lại icon app (cần Playwright)
 public/                 manifest PWA, service worker, icon
@@ -118,9 +122,10 @@ Logic dùng tọa độ "pixel": mỗi ô bản đồ rộng `T = 80`; `x` sang 
    | ` ` (dấu cách) | kênh / hố (rơi là chết) |
    | `S` | chỗ xuất phát · `F` đích (ô sàn) |
 
-3. Bẫy đặt theo tọa độ ô (cột, hàng), `0.5` là giữa ô. Hàm có sẵn: `hole` (ổ gà, `hidden` = tàng hình), `dog`, `mover` (car/bike/bus/cart/truck chạy thẳng theo hướng `R L U D`; `every` lặp lại, `aim` nhắm vào bạn, `stay` đỗ lại chắn đường, `roof` đứng lên nóc được), `pole`/`tree` (đổ theo góc `ang`), `fall` (máy lạnh, chậu kiểng, thép rơi đúng chỗ bạn đứng), `manhole`, `nails`, `light`, `speedcam`, `gate`, `walker` (bà cụ), `finish` (`run` = đích bỏ chạy), `sign` (đích giả), `plat` (thúng, giàn giáo; `mx/mz` di chuyển, `fall` sập), `banner`, `block`, `car` (ô tô đỗ, nhảy lên nóc được), `txt`, `oil` (vũng nhớt, mất lái), `bump` (gờ giảm tốc, `kmh`), `speedcam` (`kmh`, `min: true` = tốc độ tối thiểu), `thrower` (bà tầng 2 ném dép / tạt nước vào chỗ bạn sắp tới), `door` (cửa ô tô bật ra), `branch` (cành cây đấm theo chu kỳ), `fakewin` (đích giả; đích thật là `finish(..., { after: true })`), `call` (cuộc gọi troll che màn hình: `boss`, `mom`, `ex`, `bank`, `grab`). Tham số `at: [c, r]` và `tr` đặt điểm kích hoạt và bán kính.
+3. Chữ mới (lời nhắc, tên khu, nhãn đích...) cần thêm bản dịch vào `src/lang/en.js`; `npm test` sẽ liệt kê câu còn thiếu.
+4. Bẫy đặt theo tọa độ ô (cột, hàng), `0.5` là giữa ô. Hàm có sẵn: `hole` (ổ gà, `hidden` = tàng hình), `dog`, `mover` (car/bike/bus/cart/truck chạy thẳng theo hướng `R L U D`; `every` lặp lại, `aim` nhắm vào bạn, `stay` đỗ lại chắn đường, `roof` đứng lên nóc được), `pole`/`tree` (đổ theo góc `ang`), `fall` (máy lạnh, chậu kiểng, thép rơi đúng chỗ bạn đứng), `manhole`, `nails`, `light`, `speedcam`, `gate`, `walker` (bà cụ), `finish` (`run` = đích bỏ chạy), `sign` (đích giả), `plat` (thúng, giàn giáo; `mx/mz` di chuyển, `fall` sập), `banner`, `block`, `car` (ô tô đỗ, nhảy lên nóc được), `txt`, `oil` (vũng nhớt, mất lái), `bump` (gờ giảm tốc, `kmh`), `speedcam` (`kmh`, `min: true` = tốc độ tối thiểu), `thrower` (bà tầng 2 ném dép / tạt nước vào chỗ bạn sắp tới), `door` (cửa ô tô bật ra), `branch` (cành cây đấm theo chu kỳ), `fakewin` (đích giả; đích thật là `finish(..., { after: true })`), `call` (cuộc gọi troll che màn hình: `boss`, `mom`, `ex`, `bank`, `ride`). Tham số `at: [c, r]` và `tr` đặt điểm kích hoạt và bán kính.
    Bẫy theo lượt: `first: true` chỉ có ở lần chơi đầu, `retry: true` chỉ có sau khi đã chết ít nhất một lần.
-4. Thêm lời giải cho bot vào `scripts/solutions.mjs` (một kịch bản, hoặc `{ 0: [...], 5: [...] }` nếu lần đầu và lần chơi lại khác nhau) rồi chạy `npm test`. Gỡ lỗi một màn: `node scripts/dbg.mjs <id>` in ra từng sự kiện.
+5. Thêm lời giải cho bot vào `scripts/solutions.mjs` (một kịch bản, hoặc `{ 0: [...], 5: [...] }` nếu lần đầu và lần chơi lại khác nhau) rồi chạy `npm test`. Gỡ lỗi một màn: `node scripts/dbg.mjs <id>` in ra từng sự kiện.
 
 Số liệu vật lý tham khảo: tốc độ tối đa 4.4 px/khung (≈ 75 km/h trên đồng hồ), nhảy cao ≈ 84 px, nhảy xa ≈ 150 px (gần 2 ô) khi chạy hết tốc, nên hố rộng 1 ô nhảy qua được, hố 2 ô thì không; dây điện ở độ cao 250 px (bị nắp cống bắn lên là giật điện).
 

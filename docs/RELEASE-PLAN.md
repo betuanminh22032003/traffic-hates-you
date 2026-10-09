@@ -6,7 +6,7 @@
 
 Game có ba đặc điểm quyết định chọn nền tảng:
 
-- **Toàn tiếng Việt, bối cảnh Sài Gòn.** Người chơi hợp nhất là người Việt; người nước ngoài chỉ chơi được khi có bản tiếng Anh.
+- **Tiếng Việt và tiếng Anh, bối cảnh Sài Gòn.** Người chơi hợp nhất là người Việt; từ bản v3.1 đã có tiếng Anh (tự chọn theo trình duyệt) để lên các cổng game nước ngoài.
 - **Chạy trên web (HTML5), nhẹ (~2 MB), có offline, có điều khiển cảm ứng.** Đăng lên web gần như không tốn gì; lên app store thì phải đóng gói thêm.
 - **Thể loại rage game "chết là cười".** Loại này lan truyền nhờ clip ngắn (TikTok, Reels, YouTube Shorts) hơn là nhờ người ta lướt cửa hàng ứng dụng.
 
@@ -59,12 +59,11 @@ Các cổng như CrazyGames và Poki chủ yếu phục vụ người chơi nư�
 
 **Việc kỹ thuật cần làm:**
 
-- [ ] **Tách chữ ra file ngôn ngữ.** Chữ đang nằm rải rác trong `game.html`, `src/game/messages.js` và `src/game/levels.js`.
-  - Thêm bản tiếng Anh, tự chọn theo ngôn ngữ của trình duyệt, có nút đổi trong Cài đặt.
-  - Câu đùa kiểu Việt (đèn đỏ, bà cụ, Grab) cần dịch thoáng cho người nước ngoài hiểu, không dịch từng chữ.
+- [x] **Bản tiếng Anh** (xong ở v3.1): từ điển `src/lang/en.js`, tự chọn theo ngôn ngữ trình duyệt, có nút đổi trong Cài đặt; `npm test` báo nếu có câu tiếng Việt chưa dịch. Bảng hiệu phố cố ý giữ tiếng Việt.
+  - Nên nhờ một người bản xứ đọc lại các câu đùa trước khi nộp cổng game.
 - [ ] **Tích hợp SDK của cổng game:** lưu tiến trình theo SDK, gọi quảng cáo đúng chỗ, báo lúc bắt đầu và dừng chơi.
   - **Chỗ chèn quảng cáo hợp lý:** giữa các chương (màn hình giới thiệu chương), và sau khoảng 5 lần chết (không phải lần nào chết cũng chèn).
-  - Có thể thêm "xem quảng cáo để được hồi sinh tại chỗ", thay cho nút Gọi Grab.
+  - Có thể thêm "xem quảng cáo để được hồi sinh tại chỗ", thay cho nút Gọi xe ôm.
 - [ ] **Bỏ các link ra ngoài trong bản dành cho cổng game** (nút chia sẻ) nếu cổng yêu cầu.
 - [ ] **Vào thẳng màn chơi nhanh**: cổng game đánh giá cao việc bấm là chơi ngay. Nên rút ngắn hoặc bỏ màn giới thiệu chương ở lần đầu.
 - [ ] **Chạy thử trên máy yếu**: điện thoại Android tầm trung, Chromebook. Đặt mức đồ hoạ "Tự động" thấp hơn nếu bị giật.
@@ -91,7 +90,7 @@ Các cổng như CrazyGames và Poki chủ yếu phục vụ người chơi nư�
    - mô tả song ngữ;
    - xếp hạng độ tuổi (bạo lực hoạt hình nhẹ);
    - chính sách quyền riêng tư (cần có ngay cả khi không thu dữ liệu).
-4. **Đổi tên thương hiệu thật trong game** trước khi lên Google Play: "Grab" (nút Gọi Grab, cuộc gọi troll) nên đổi thành tên chung như "xe ôm công nghệ" để tránh bị từ chối vì dùng thương hiệu người khác.
+4. ~~Đổi tên thương hiệu thật trong game~~: đã xong ở v3.1, "Grab" thành "xe ôm công nghệ" / "Gọi xe ôm" (tiếng Anh: "ride app" / "Call a ride").
 
 ## 6. Pháp lý và rủi ro cần biết
 
@@ -99,7 +98,7 @@ Các cổng như CrazyGames và Poki chủ yếu phục vụ người chơi nư�
 |---|---|---|
 | **Quy định game ở Việt Nam** (Nghị định 147/2024/NĐ-CP). Game này không có tương tác giữa người chơi với nhau hay với máy chủ, nên gần với loại **G4**. Theo các nguồn tổng hợp, phát hành game G2–G4 cần doanh nghiệp có Giấy chứng nhận và Giấy xác nhận thông báo phát hành. Mình **chưa tìm được** nguồn nói rõ cá nhân phát hành game miễn phí có phải làm thủ tục này không. | Cao nếu kiếm tiền tại Việt Nam | **Hỏi luật sư hoặc Cục Phát thanh, truyền hình và thông tin điện tử** trước khi gắn quảng cáo hoặc lên Google Play cho thị trường Việt Nam. Trong lúc chờ, để game miễn phí, không quảng cáo. |
 | **Tên game giống "Trees Hate You"** | Trung bình | Tên đang bám theo game gốc. Nếu game nổi, có thể bị phàn nàn. Cân nhắc tên riêng hơn, ví dụ "Kẹt Xe Hates You" hay "Saigon Hates You", trước khi lên cổng lớn hoặc Google Play. |
-| **Thương hiệu thật trong game** ("Grab") | Thấp trên web, trung bình trên cửa hàng | Đổi tên chung như mục 5.4. |
+| **Thương hiệu thật trong game** ("Grab") | Đã xử lý | Đổi thành "xe ôm công nghệ" ở v3.1. |
 | **Bạo lực hoạt hình** (chết vì xe, rơi đồ) | Thấp | Ghi rõ độ tuổi 12+ trên các nền tảng; phần Giới thiệu trong game đã có câu nhắc tuân thủ luật giao thông. |
 
 ## 7. Kiếm tiền
@@ -118,8 +117,8 @@ Thứ tự gợi ý; không cần làm ngay:
 |---|---|
 | 1 | Mua tên miền, gắn thống kê, làm ảnh chia sẻ mới, quay 10 clip |
 | 2 | Ra mắt: đăng clip mỗi ngày, đăng nhóm Facebook, gửi streamer; mở trang itch.io |
-| 3–4 | Đọc số liệu (người chơi bỏ ở đâu), chỉnh độ khó chỗ bỏ nhiều; tách chữ ra file ngôn ngữ |
-| 5–8 | Bản tiếng Anh, tích hợp SDK, nộp CrazyGames; hỏi pháp lý; đổi tên "Grab" |
+| 3–4 | Đọc số liệu (người chơi bỏ ở đâu), chỉnh độ khó chỗ bỏ nhiều; nhờ người bản xứ đọc lại bản tiếng Anh |
+| 5–8 | Tích hợp SDK, nộp CrazyGames; hỏi pháp lý |
 | 9–12 | Google Play (12 người thử × 14 ngày), nộp Poki nếu số liệu CrazyGames tốt |
 
 ## 9. Chỉ số để biết đang đi đúng

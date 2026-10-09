@@ -275,7 +275,7 @@ export const LEVELS = [
     '##################'
   ], build: () => [
     txt(2, 1, 'Kẹt xe. Đi trên nóc xe cho nhanh.', { size: 16 }),
-    call(5.5, 2.5, 'grab', { tr: 60, dur: 120 }),
+    call(5.5, 2.5, 'ride', { tr: 60, dur: 120 }),
     car(3, 1, { horiz: false }), car(3, 3, { horiz: false, color: '#4d7cfe' }),
     block(5, 1, 2, 1, { top: 92 }), car(5, 2, { color: '#f4d35e' }), block(5, 3, 2, 2, { top: 92 }),
     car(8, 1, { color: '#2fa84f' }), car(8, 2), car(8, 3, { color: '#8e44ad' }), car(8, 4, { color: '#f4f4f4' }),
