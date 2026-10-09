@@ -75,7 +75,7 @@ Kết nối repo, build command `npm run build`, publish directory `dist`. Khôn
 
 ## Thiết kế
 
-Tài liệu thiết kế sản phẩm (vấn đề, nguyên tắc troll, cơ chế, danh sách màn): [`docs/DESIGN.md`](docs/DESIGN.md).
+Tài liệu thiết kế sản phẩm (vấn đề, nguyên tắc troll, cơ chế, danh sách màn): [`docs/DESIGN.md`](docs/DESIGN.md). Kế hoạch phát hành (nền tảng, lịch, pháp lý): [`docs/RELEASE-PLAN.md`](docs/RELEASE-PLAN.md).
 
 ## Cấu trúc mã
 
