@@ -6,7 +6,7 @@ import '@fontsource/baloo-2/vietnamese-600.css';
 import '@fontsource/baloo-2/vietnamese-800.css';
 import './style.css';
 import './polyfills.js';
-import { makeWorld, step, KMH } from './game/logic.js';
+import { makeWorld, step, KMH, T } from './game/logic.js';
 import { LEVELS, CHAPTERS } from './game/levels.js';
 import { STAGES } from './game/stages.js';
 import { deathText, HEAD, taunt, CALLS } from './game/messages.js';
@@ -28,7 +28,9 @@ view.touch = isTouch;
 /* ---------- state ---------- */
 let mode = 'title';          // title | menu | chapter | play | pause | end
 let lvIdx = 0, world = null, levelDeaths = 0, cardShown = false, chapterT = 0;
-let attempts = [];           // deaths per zone of the current stage (re-rolls that zone's traps)
+let attempts = [];           // deaths inside each zone of the current stage (switches that zone's first/retry traps)
+let rolls = [];              // deaths in the alley leading to each zone (only re-rolls the alley traps)
+let grabbed = false;         // a Grab skipped part of this stage: no record for it
 let causeCount = {}, grabTried = false, fakeAt = -1, callUntil = -1;
 let attractWorld = null;
 let frozen = false;          // test hook: stop real-time stepping
@@ -51,7 +53,8 @@ function setHud(on) { $('hud').classList.toggle('hidden', !on); $('touch').class
 function toast(s) { const el = $('toast'); el.textContent = s; el.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.add('hidden'), 1800); }
 
 const runLevel = () => S.run.level ?? 0;
-const runCp = () => S.run.cp ?? 0;
+// (clamped: an old or edited save could point past the chapter's last checkpoint)
+const runCp = () => Math.max(0, Math.min(S.run.cp ?? 0, (STAGES[runLevel()]?.zones.length ?? 1) - 1));
 const canContinue = () => (runLevel() > 0 || runCp() > 0) && runLevel() < STAGES.length;
 
 function goTitle() {
@@ -108,6 +111,7 @@ let resetArm = 0;
 $('o-reset').onclick = () => {
   if (Date.now() - resetArm > 2500) { resetArm = Date.now(); $('o-reset').textContent = 'CHẮC CHƯA?'; setTimeout(() => ($('o-reset').textContent = 'XÓA'), 2500); return; }
   resetProgress(); resetArm = 0; $('o-reset').textContent = 'XÓA'; toast('Đã xóa tiến trình'); A.sfx('crack');
+  if (world) goTitle(); // a reset from the pause menu ends the game in progress, or it would save into the fresh slate
 };
 function toggleFullscreen() {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
@@ -124,7 +128,7 @@ $('b-play').addEventListener('mouseenter', () => {
   A.sfx('hehe'); toast('Hụt 😜');
   setTimeout(() => { b.style.transform = ''; }, 1400);
 });
-$('b-play').onclick = () => { A.sfx('click'); if (canContinue()) startLevel(runLevel(), true, false, runCp()); else newRun(); };
+$('b-play').onclick = () => { A.sfx('click'); if (canContinue()) startLevel(runLevel(), true, false, runCp(), true); else newRun(); };
 $('b-new').onclick = () => { A.sfx('click'); newRun(); };
 $('b-select').onclick = () => { A.sfx('click'); buildSelect(); returnTo = 's-title'; show('s-select'); };
 $('b-settings').onclick = () => { A.sfx('click'); refreshSettings(); returnTo = 's-title'; show('s-settings'); };
@@ -140,16 +144,21 @@ $('e-menu').onclick = () => { A.sfx('click'); goTitle(); };
 $('e-share').onclick = share;
 
 // A story run counts for the record only when it was played from level 1 in order.
-function newRun() { S.run = { deaths: 0, perLevel: {}, level: 0, cp: 0, full: true }; save(); startLevel(0, true); }
+function newRun() { S.run = { deaths: 0, perLevel: {}, level: 0, cp: 0, full: true, att: null }; save(); startLevel(0, true); }
 
 /* ---------- level flow ---------- */
 // A stage is a whole chapter in one map; cp = the checkpoint (zone) to start from.
-function startLevel(i, intro, fromSelect = false, cp = 0) {
+// resume = "continue" from the title: the death counts of this stage come back from the save.
+function startLevel(i, intro, fromSelect = false, cp = 0, resume = false) {
   if (fromSelect && i !== runLevel()) S.run.full = false;
-  S.run.level = i; S.run.cp = cp; save();
-  lvIdx = i; levelDeaths = 0; jumpQueued = false; causeCount = {}; grabTried = false;
-  attempts = STAGES[i].zones.map(() => 0);
-  world = makeWorld(STAGES[i], { attempts, cp });
+  const n = STAGES[i].zones.length, a = resume && S.run.att?.stage === i ? S.run.att : null;
+  attempts = Array.from({ length: n }, (_, k) => a?.zone?.[k] ?? 0);
+  rolls = Array.from({ length: n }, (_, k) => a?.alley?.[k] ?? 0);
+  grabbed = !!a?.grabbed;
+  lvIdx = i; jumpQueued = false; causeCount = {}; grabTried = false;
+  S.run.level = i; S.run.cp = cp; saveStage();
+  world = makeWorld(STAGES[i], { attempts, rolls, cp });
+  levelDeaths = attempts[cp] + rolls[cp];
   view.attractMode = false;
   view.load(world, theme(i));
   hideCards(); hideCall(); setHud(true); updateHud(true);
@@ -169,15 +178,22 @@ function endChapterSplash() {
 // Every retry rebuilds the stage from the last checkpoint: that zone's traps change after a death, and the
 // alley traps are rolled again.
 function retry(cp = world.cp) {
-  levelDeaths = attempts[cp] ?? 0; grabTried = false;
-  world = makeWorld(STAGES[lvIdx], { attempts, cp });
+  levelDeaths = attempts[cp] + rolls[cp]; grabTried = false;
+  world = makeWorld(STAGES[lvIdx], { attempts, rolls, cp });
   view.load(world, theme(lvIdx));
   hideCards(); hideCall(); mode = 'play'; show(null); jumpQueued = false;
 }
 
+// Progress of the stage in play, so "continue" knows how often each zone already killed you.
+function saveStage() { S.run.att = { stage: lvIdx, zone: attempts, alley: rolls, grabbed }; save(); }
+
 function onDeath() {
-  attempts[world.cp] = (attempts[world.cp] ?? 0) + 1;
-  levelDeaths = attempts[world.cp];
+  // a death in the alley before a zone must not change that zone's traps before you have even seen them
+  const z = world.zones[world.cp], c = Math.floor(world.p.x / T), r = Math.floor(world.p.z / T);
+  const inZone = c >= z.ox && c < z.ox + z.W && r >= z.oy && r < z.oy + z.H;
+  if (inZone) attempts[world.cp]++; else rolls[world.cp]++;
+  levelDeaths = attempts[world.cp] + rolls[world.cp];
+  S.run.att = { stage: lvIdx, zone: attempts, alley: rolls, grabbed };
   causeCount[world.cause] = (causeCount[world.cause] || 0) + 1;
   S.totalDeaths++; S.run.deaths++;
   const zid = STAGES[lvIdx].zones[world.cp].level.id;
@@ -200,17 +216,22 @@ function showDeathCard() {
   cardShown = true;
 }
 
-const stageDeaths = () => attempts.reduce((a, b) => a + b, 0);
+const stageDeaths = () => [...attempts, ...rolls].reduce((a, b) => a + b, 0);
 function onClear() {
   const id = STAGES[lvIdx].id;
   S.cleared[id] = true;
-  S.best[id] = Math.min(S.best[id] ?? Infinity, stageDeaths());
+  if (!grabbed) S.best[id] = Math.min(S.best[id] ?? Infinity, stageDeaths());
   S.unlocked = Math.max(S.unlocked, id + 1);
-  S.run.level = lvIdx + 1; S.run.cp = 0;
+  S.run.level = lvIdx + 1; S.run.cp = 0; S.run.att = null;
+  // the whole run is over: count it now, even if the player leaves before the ending screen
+  if (lvIdx === STAGES.length - 1 && S.run.full) {
+    S.finished++;
+    if (S.bestRun == null || S.run.deaths < S.bestRun) S.bestRun = S.run.deaths;
+  }
   save();
 }
 function onCheckpoint(d) {
-  S.run.cp = d.zone; save();
+  S.run.cp = d.zone; saveStage();
   toast(`🚩 CHECKPOINT · ${d.name}`);
   updateHud(true);
 }
@@ -238,10 +259,10 @@ $('dead-grab').onclick = (e) => {
     $('dead-grab').textContent = '🛵 GỌI GRAB LẠI (bỏ qua đoạn, +15 phút)';
     return;
   }
-  S.run.penalty = (S.run.penalty || 0) + 15; S.run.full = false; save();
+  S.run.penalty = (S.run.penalty || 0) + 15; S.run.full = false; grabbed = true; saveStage();
   toast('🛵 Grab chở qua đoạn này. Phí: 15 phút + lòng tự trọng');
   // drops you at the next checkpoint (or at the next chapter)
-  if (world.cp + 1 < world.zones.length) { S.run.cp = world.cp + 1; save(); retry(world.cp + 1); updateHud(true); }
+  if (world.cp + 1 < world.zones.length) { S.run.cp = world.cp + 1; saveStage(); retry(world.cp + 1); updateHud(true); }
   else { onClear(); nextLevel(); }
 };
 const fmt = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
@@ -250,17 +271,13 @@ function ending() {
   mode = 'end'; setHud(false); hideCards();
   lvIdx = STAGES.length;
   const m = clockMin(), late = m - 8 * 60;
-  const full = !!S.run.full;
-  if (full) {
-    S.finished++;
-    if (S.bestRun == null || S.run.deaths < S.bestRun) S.bestRun = S.run.deaths;
-  }
+  const full = !!S.run.full; // (finish count and record were already saved by onClear)
   S.run.level = STAGES.length; S.run.cp = 0;
   save();
   $('end-time').textContent = `Tới công ty lúc ${fmt(m)}!`;
   $('end-late').textContent = late > 0 ? `(trễ ${late} phút... bị trừ lương)` : 'Đúng giờ! Siêu nhân thật sự!';
   $('end-stats').innerHTML = `💀 Số lần chết: <b>${S.run.deaths}</b>` + (S.bestRun != null ? ` · Kỷ lục: <b>${S.bestRun}</b>` : '') +
-    (full ? '' : '<br><small>(Lượt này có chọn màn nên không tính kỷ lục)</small>') +
+    (full ? '' : '<br><small>(Lượt này có chọn chương hoặc gọi Grab nên không tính kỷ lục)</small>') +
     `<br>Tổng cộng đã chết ${S.totalDeaths} lần trên đường đi làm.`;
   show('s-end');
   A.sfx('win');
@@ -419,7 +436,7 @@ function tick(inp) {
 // The level-clear card, for a finish that isn't one.
 function showFakeClear() {
   $('clear-head').textContent = 'QUA MÀN!';
-  $('clear-msg').textContent = levelDeaths ? `Màn này chết ${levelDeaths} lần` : 'Không chết lần nào?! Giỏi quá ta...';
+  $('clear-msg').textContent = levelDeaths ? `Đoạn này chết ${levelDeaths} lần` : 'Không chết lần nào?! Giỏi quá ta...';
   $('c-clear').classList.remove('hidden');
   fakeAt = world.t;
 }

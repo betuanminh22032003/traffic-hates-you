@@ -9,7 +9,7 @@ const DEFAULT = {
   best: {},             // level id -> fewest deaths when cleared
   cleared: {},          // level id -> true
   totalDeaths: 0,
-  run: { deaths: 0, perLevel: {}, level: 0, cp: 0, full: true }, // current story run (level = stage index, cp = checkpoint) (resets on "Chơi mới")
+  run: { deaths: 0, perLevel: {}, level: 0, cp: 0, full: true, att: null }, // current story run (level = stage index, cp = checkpoint) (resets on "Chơi mới")
   finished: 0,          // number of times the game was beaten
   bestRun: null,        // fewest deaths for a full run
   settings: { music: true, sfx: true, quality: 'auto', vibrate: true }
@@ -22,7 +22,7 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const d = JSON.parse(raw);
-      return { ...clone(DEFAULT), ...d, settings: { ...DEFAULT.settings, ...(d.settings || {}) }, run: { ...DEFAULT.run, ...(d.run || {}) } };
+      return { ...clone(DEFAULT), ...d, settings: { ...DEFAULT.settings, ...(d.settings || {}) }, run: { ...clone(DEFAULT.run), ...(d.run || {}) } };
     }
     // coming from v1 (15 separate levels): keep the settings and the death count, progress starts over
     const old = JSON.parse(localStorage.getItem('traffic-hates-you:v1') || 'null');

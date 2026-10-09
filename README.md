@@ -66,11 +66,12 @@ Kết nối repo, build command `npm run build`, publish directory `dist`. Khôn
 
 ### Trước khi phát hành, kiểm tra
 
-- [ ] `npm test` báo `All levels beatable.`
-- [ ] `npm run build` không lỗi, `npm run preview` chơi thử được màn 1.
-- [ ] Đổi link/ảnh chia sẻ nếu cần: thẻ `og:*` trong `game.html`, ảnh `public/icons/og.png`.
-- [ ] Đổi phiên bản trong `package.json` và chữ `v1.0` ở màn hình tiêu đề (`game.html`).
-- [ ] Đổi tên cache trong `public/sw.js` (`thy-v1` → `thy-v2`...) mỗi lần phát hành bản mới để người chơi cũ nhận bản mới ngay.
+- [ ] `npm test` báo `Every chapter map is sealed by its checkpoints and every alley is passable.` (và các khu đều `ok`).
+- [ ] `npm run build` không lỗi, `npm run preview` chơi thử được chương 1; tắt mạng rồi tải lại trang vẫn chơi được.
+- [ ] Đổi link/ảnh chia sẻ nếu đăng ở chỗ khác GitHub Pages: thẻ `og:url`, `og:image` trong `game.html` phải là link tuyệt đối; ảnh ở `public/icons/og.png` (1200 × 630).
+- [ ] Đổi phiên bản trong `package.json` và chữ `v3.0` ở màn hình tiêu đề (`game.html`).
+- [ ] Không cần đổi tên cache: mỗi lần build, `sw.js` tự nhận mã phiên bản mới và danh sách file cần lưu offline.
+- [ ] Đổi cấu trúc màn/chương thì tăng khóa lưu trong `src/save.js` (`traffic-hates-you:v2` → `v3`) để save cũ không trỏ sai chỗ.
 
 ## Thiết kế
 
@@ -85,9 +86,9 @@ src/game/logic.js       mô phỏng gameplay thuần (không DOM, không three.j
 src/game/levels.js      dữ liệu 15 khu + 4 chương
 src/game/stages.js      ghép các khu của một chương thành một bản đồ lớn: hẻm nối, cổng checkpoint, bẫy ngẫu nhiên
 src/game/messages.js    câu thoại khi chết
-src/render/view.js      scene three.js, camera cao 3/4, người chơi, hạt, bong bóng thoại, cảnh báo xe ngoài màn hình
+src/render/view.js      scene three.js, camera cao 3/4, người chơi, hạt, bong bóng thoại
 src/render/world.js     dựng khu phố từ bản đồ ô: đường, vỉa hè, cỏ, kênh, hố, nhà ống, bảng hiệu, trời, mưa
-src/render/entities.js  hình 3D cho từng loại bẫy
+src/render/entities.js  hình 3D cho từng loại bẫy, cổng và cờ checkpoint
 src/render/models.js    mô hình (xe máy, chó, CSGT, bà cụ, xe buýt, ô tô, cây...)
 src/render/toon.js      vật liệu toon, viền, chữ vẽ bằng canvas
 src/audio.js            hiệu ứng âm thanh + nhạc nền tổng hợp
