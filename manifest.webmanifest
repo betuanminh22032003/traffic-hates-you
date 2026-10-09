@@ -1,8 +1,9 @@
 {
   "name": "Traffic Hates You – bản Sài Gòn",
   "short_name": "Traffic Hates You",
-  "description": "Game troll-platformer 3D: chạy xe máy đi làm ở Sài Gòn trước 8:00.",
+  "description": "Game troll-platformer 3D: chạy xe máy đi làm ở Sài Gòn trước 8:00. 4 chương, mỗi chương một bản đồ lớn có checkpoint.",
   "lang": "vi",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
