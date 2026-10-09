@@ -29,7 +29,7 @@
 
 <div id="hud" class="hidden">
   <div class="hud-l">
-    <div id="hud-level" class="pill">Chương 1 · Hẻm 42 1/4</div>
+    <div id="hud-level" class="pill"></div>
     <div id="hud-deaths" class="pill gold">💀 0</div>
   </div>
   <div class="hud-r">
@@ -60,7 +60,7 @@
     <button id="b-settings" class="btn">CÀI ĐẶT</button>
   </div>
   <p class="hint" id="title-hint"></p>
-  <p class="foot">v3.0 · <a href="#" id="b-credits">Giới thiệu</a></p>
+  <p class="foot">v3.1 · <a href="#" id="b-credits">Giới thiệu</a></p>
 </section>
 
 <!-- level select -->
@@ -77,6 +77,7 @@
     <label class="opt"><span>Nhạc nền</span><button class="tog" id="o-music"></button></label>
     <label class="opt"><span>Hiệu ứng âm thanh</span><button class="tog" id="o-sfx"></button></label>
     <label class="opt"><span>Rung (điện thoại)</span><button class="tog" id="o-vibrate"></button></label>
+    <label class="opt"><span>Ngôn ngữ</span><button class="cyc" id="o-lang"></button></label>
     <label class="opt"><span>Đồ họa</span><button class="cyc" id="o-quality"></button></label>
     <label class="opt"><span>Toàn màn hình</span><button class="cyc" id="o-full">BẬT</button></label>
     <label class="opt"><span>Tiến trình</span><button class="cyc danger" id="o-reset">XÓA</button></label>
@@ -87,7 +88,7 @@
 <!-- credits -->
 <section id="s-credits" class="screen hidden">
   <h2>GIỚI THIỆU</h2>
-  <div class="card text">
+  <div class="card text" data-i18n-html="credits">
     <p><b>Traffic Hates You</b> là game "troll" về giao thông Sài Gòn. Mọi thứ trên đường đều ghét bạn: ổ gà, đèn đỏ, cột điện, chó, bà cụ, xe buýt, ô tô, cả cây xanh.</p>
     <p>Chết là chuyện bình thường. Mỗi lần chết đồng hồ chạy thêm 1 phút. Tới công ty trước 8:00 là thắng... chắc vậy.</p>
     <p><b>Điều khiển:</b> ←↑→↓ / WASD chạy 8 hướng (giữ lâu thì ga lên dần tới ~68 km/h, nhả ra là phanh) · giữ <b>Shift</b> để chạy chậm (~34 km/h) · Space nhảy · R chơi lại từ checkpoint · Esc tạm dừng. Điện thoại: kéo cần gạt bên trái (kéo nhẹ = chạy chậm), ⤒ nhảy, 🐢 giữ để chạy chậm. Hỗ trợ tay cầm (A nhảy, B/LB/RB chạy chậm).</p>
@@ -114,7 +115,7 @@
 <section id="s-chapter" class="screen dim hidden">
   <div class="chap-no" id="chap-no">CHƯƠNG 1</div>
   <div class="chap-name" id="chap-name">Hẻm Nhỏ</div>
-  <div class="chap-sub" id="chap-sub">6:30 sáng</div>
+  <div class="chap-sub" id="chap-sub"></div>
 </section>
 
 <!-- death card -->
@@ -123,7 +124,7 @@
   <div class="msg" id="dead-msg"></div>
   <div class="sub" id="dead-sub"></div>
   <div class="sub taunt" id="dead-taunt"></div>
-  <button class="btn small hidden" id="dead-grab">🛵 GỌI GRAB</button>
+  <button class="btn small hidden" id="dead-grab">🛵 GỌI XE ÔM</button>
   <div class="tap blink" id="dead-tap"></div>
 </section>
 

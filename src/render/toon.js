@@ -1,6 +1,7 @@
 // Look: physically based materials (soft, stylised-realistic) with thin ink outlines, plus canvas-text textures.
 // Units everywhere in the 3D scene are logic pixels (1 unit = 1 px of the 2D prototype), Y up.
 import * as THREE from 'three';
+import { tr } from '../i18n.js';
 
 export const INK = 0x2a1f1a;
 export const FONT = "'Baloo 2', system-ui, sans-serif";
@@ -91,6 +92,7 @@ export function fontPx(sz) { return `800 ${sz}px ${FONT}`; }
 
 // Outlined cartoon text drawn into a transparent texture, returned as a camera-facing plane.
 export function textPlane(s, size = 22, color = '#fff', o = {}) {
+  s = tr(s);
   const scale = 3, pad = 14;
   const meas = document.createElement('canvas').getContext('2d');
   meas.font = fontPx(size * scale);
@@ -112,6 +114,7 @@ export function textPlane(s, size = 22, color = '#fff', o = {}) {
 
 // Flat sign board with text (shop signs, finish banner, bus route).
 export function signTex(s, { w = 256, h = 64, bg = '#e63946', fg = '#fff', size = 34, border = true } = {}) {
+  s = tr(s);
   return canvasTex(w, h, (ctx) => {
     ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
     if (border) { ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, w - 6, h - 6); }

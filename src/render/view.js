@@ -7,6 +7,7 @@ import { makeRider } from './models.js';
 import { buildWorld, THEMES } from './world.js';
 import { makeEntityView } from './entities.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { tr } from '../i18n.js';
 
 // Camera sits high above and in front (toward +z) of the player, looking down at ~58 degrees.
 const CAM_UP = 700, CAM_BACK = 440;
@@ -266,10 +267,12 @@ function roundRect(c, x, y, w, h, r) {
   c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
 }
 function outlined(c, s, x, y, sz, fill = '#fff') {
+  s = tr(s);
   c.font = fontPx(sz); c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
   c.lineWidth = Math.max(3, sz / 4.5); c.strokeStyle = '#2a1f1a'; c.strokeText(s, x, y); c.fillStyle = fill; c.fillText(s, x, y);
 }
 function bubble(c, s, x, y, sz) {
+  s = tr(s);
   c.font = fontPx(sz);
   const w = c.measureText(s).width + 22, h = sz + 16;
   c.lineWidth = 3; c.strokeStyle = '#2a1f1a'; c.fillStyle = '#fff';

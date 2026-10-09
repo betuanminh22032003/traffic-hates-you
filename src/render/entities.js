@@ -5,6 +5,7 @@ import { T, tileAt, isSolidTile } from '../game/logic.js';
 import { part, box, cyl, ico, sph, M, textPlane, canvasTex, texMat, signTex } from './toon.js';
 import * as MD from './models.js';
 import { groundMat } from './world.js';
+import { tr } from '../i18n.js';
 
 const B = (s, x, y, z, size = 15) => ({ s, x, y, z, size });
 const own = m => { m.userData.own = true; return m; };
@@ -579,7 +580,7 @@ V.cpgate = (e) => {
   across.add(part(box(14, 90, 14), '#2b2d42', { pos: [e.w / 2 - 7, 45, 0] }));
   const boom = new THREE.Group(); boom.position.set(-e.w / 2 + 7, 60, 0); across.add(boom);
   for (let i = 0; i < 4; i++) boom.add(part(box(e.w / 4, 12, 8), i % 2 ? '#fff' : '#e63946', { pos: [e.w / 8 + i * e.w / 4, 0, 0] }));
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(130, 32), texMat(signTex('🚩 ' + e.label, { w: 512, h: 128, bg: '#2a9d8f', size: 60 })));
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(130, 32), texMat(signTex('🚩 ' + tr(e.label), { w: 512, h: 128, bg: '#2a9d8f', size: 60 })));
   sign.position.set(0, 112, 0); g.add(sign); // faces the camera whichever way the boom points
   return {
     obj: g,

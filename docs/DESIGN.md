@@ -38,10 +38,10 @@ Bản v2 áp dụng ba nguyên tắc này vào bối cảnh giao thông Sài Gò
 | **Gờ giảm tốc** (`bump`) | Chạy quá tốc độ là bị hất lên mớ dây điện | Giữ Shift, hoặc nhảy qua |
 | **Vũng nhớt** (`oil`) | Mất lái, không phanh được, cứ thế trượt (màn 5: trượt thẳng vào ổ gà) | Vào nhớt với tốc độ cao rồi nhảy từ trên vũng nhớt |
 | **Camera tốc độ tối thiểu** | Vừa bắt chạy chậm xong lại bắt chạy nhanh | Đọc biển xanh "TỐI THIỂU 25" |
-| **Cuộc gọi troll** (`call`) | Sếp, mẹ, người yêu cũ, ngân hàng, Grab gọi tới, che nửa màn hình đúng lúc gay cấn. Không chặn thao tác | Bình tĩnh |
+| **Cuộc gọi troll** (`call`) | Sếp, mẹ, người yêu cũ, ngân hàng, app xe ôm gọi tới, che nửa màn hình đúng lúc gay cấn. Không chặn thao tác | Bình tĩnh |
 | **Đứng yên bị khịa** | Đứng yên quá 5 giây thì game nói: "Sợ hả? 🐔" | |
 | **Thẻ chết** | Thêm "chết y chang N lần rồi" và câu khịa tăng dần theo số lần chết | |
-| **Nút "Gọi Grab"** | Hiện sau 6 lần chết. Lần bấm đầu tài xế luôn hủy (+1 phút), bấm lần hai mới bỏ qua màn (+15 phút, lượt chơi không tính kỷ lục) | Van cầu cứu, có tính phí |
+| **Nút "Gọi xe ôm"** (trước đây là "Gọi Grab", đã đổi tên chung để không dùng thương hiệu thật) | Hiện sau 6 lần chết. Lần bấm đầu tài xế luôn hủy (+1 phút), bấm lần hai mới bỏ qua màn (+15 phút, lượt chơi không tính kỷ lục) | Van cầu cứu, có tính phí |
 | **Nút CHƠI** | Lần đầu đưa chuột vào thì nút né đi chỗ khác | |
 
 Chó đã bỏ cuộc ("...thôi mệt") nằm yên và không cắn nữa. Bẫy troll thì phải biết đường đỡ được, không để kẻ thù vô hình giết người chơi.
@@ -60,7 +60,7 @@ Chó đã bỏ cuộc ("...thôi mệt") nằm yên và không cắn nữa. Bẫ
 | 8 Ô Tô Đỗ Bậy | Nhảy nóc xe, băng rôn thấp, người yêu cũ nhắn | |
 | 9 Mưa Rào | Mưa trơn, vũng nước là hố | Vũng nước đầu tiên cũng thành hố |
 | 10 Triều Cường | Nhảy thúng, người yêu cũ gọi giữa sông | Thúng thứ 4 chìm nhanh gấp đôi |
-| 11 Kẹt Xe | Đi trên nóc xe, Grab hủy chuyến | |
+| 11 Kẹt Xe | Đi trên nóc xe, xe ôm công nghệ hủy chuyến | |
 | 12 Cây Ghét Bạn | **Cây đấm**, cây đổ, chó | Cây đổ sang hướng khác |
 | 13 Công Trình | Giàn giáo, thép rơi, sếp gọi | Giàn giáo cuối "an toàn" cũng sập |
 | 14 Bãi Giữ Xe | **Cửa ô tô bật ra**, cổng tự đóng, **đích giả** | |

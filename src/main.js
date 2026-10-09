@@ -13,6 +13,7 @@ import { deathText, HEAD, taunt, CALLS } from './game/messages.js';
 import { View } from './render/view.js';
 import * as A from './audio.js';
 import { store, save, resetProgress } from './save.js';
+import { tr, setLang, getLang, autoLang, LANGS, translatePage } from './i18n.js';
 
 const $ = id => document.getElementById(id);
 const S = store();
@@ -30,7 +31,7 @@ let mode = 'title';          // title | menu | chapter | play | pause | end
 let lvIdx = 0, world = null, levelDeaths = 0, cardShown = false, chapterT = 0;
 let attempts = [];           // deaths inside each zone of the current stage (switches that zone's first/retry traps)
 let rolls = [];              // deaths in the alley leading to each zone (only re-rolls the alley traps)
-let grabbed = false;         // a Grab skipped part of this stage: no record for it
+let grabbed = false;         // a ride ("gọi xe ôm") skipped part of this stage: no record for it
 let causeCount = {}, grabTried = false, fakeAt = -1, callUntil = -1;
 let attractWorld = null;
 let frozen = false;          // test hook: stop real-time stepping
@@ -50,7 +51,7 @@ function show(id) {
 }
 function hideCards() { $('c-dead').classList.add('hidden'); $('c-clear').classList.add('hidden'); cardShown = false; }
 function setHud(on) { $('hud').classList.toggle('hidden', !on); $('touch').classList.toggle('hidden', !(on && isTouch)); }
-function toast(s) { const el = $('toast'); el.textContent = s; el.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.add('hidden'), 1800); }
+function toast(s) { const el = $('toast'); el.textContent = tr(s); el.classList.remove('hidden'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.add('hidden'), 1800); }
 
 const runLevel = () => S.run.level ?? 0;
 // (clamped: an old or edited save could point past the chapter's last checkpoint)
@@ -63,9 +64,9 @@ function goTitle() {
   view.attractMode = true;
   view.load(attractWorld, 'dawn');
   world = null;
-  $('b-play').textContent = canContinue() ? `TIẾP TỤC · CHƯƠNG ${runLevel() + 1}` : 'CHƠI';
+  $('b-play').textContent = tr(canContinue() ? `TIẾP TỤC · CHƯƠNG ${runLevel() + 1}` : 'CHƠI');
   $('b-new').classList.toggle('hidden', !canContinue());
-  $('title-hint').textContent = isTouch ? 'Cần gạt trái: chạy · ⤒ nhảy · 🐢 giữ để chạy chậm' : '←↑→↓ / WASD chạy · SPACE nhảy · giữ SHIFT chạy chậm · R chơi lại · ESC tạm dừng';
+  $('title-hint').textContent = tr(isTouch ? 'Cần gạt trái: chạy · ⤒ nhảy · 🐢 giữ để chạy chậm' : '←↑→↓ / WASD chạy · SPACE nhảy · giữ SHIFT chạy chậm · R chơi lại · ESC tạm dừng');
   show('s-title');
   A.playMusic(0);
 }
@@ -74,14 +75,14 @@ function buildSelect() {
   const root = $('chapters'); root.innerHTML = '';
   CHAPTERS.forEach((c, ci) => {
     const box = document.createElement('div'); box.className = 'chap';
-    box.innerHTML = `<h3>Chương ${ci + 1} · ${c.name}<small>${c.sub}</small></h3>`;
+    box.innerHTML = `<h3>${tr(`Chương ${ci + 1}`)} · ${tr(c.name)}<small>${tr(c.sub)}</small></h3>`;
     const grid = document.createElement('div'); grid.className = 'lvls';
     // one big map per chapter; its old levels are now zones with a checkpoint each
     const st = STAGES[ci], locked = st.id > S.unlocked, done = S.cleared[st.id];
     const b = document.createElement('button');
     b.className = 'lv' + (locked ? ' locked' : '') + (done ? ' done' : '');
-    b.innerHTML = locked ? `<b>🔒</b><span class="st">Chương ${st.id}</span>` :
-      `<b>${st.id}</b>${st.zones.map(z => z.name).join(' → ')}<span class="st">${done ? `💀 ít nhất ${S.best[st.id] ?? 0}` : `${st.zones.length} checkpoint · chưa qua`}</span>`;
+    b.innerHTML = locked ? `<b>🔒</b><span class="st">${tr(`Chương ${st.id}`)}</span>` :
+      `<b>${st.id}</b>${st.zones.map(z => tr(z.name)).join(' → ')}<span class="st">${tr(done ? `💀 ít nhất ${S.best[st.id] ?? 0}` : `${st.zones.length} checkpoint · chưa qua`)}</span>`;
     b.disabled = locked;
     b.onclick = () => { A.sfx('click'); startLevel(ci, true, true); };
     grid.appendChild(b);
@@ -93,9 +94,10 @@ function buildSelect() {
 const QNAMES = { auto: 'TỰ ĐỘNG', high: 'CAO', medium: 'VỪA', low: 'THẤP' };
 function refreshSettings() {
   const st = S.settings;
-  for (const k of ['music', 'sfx', 'vibrate']) { const b = $('o-' + k); b.textContent = st[k] ? 'BẬT' : 'TẮT'; b.classList.toggle('on', st[k]); }
-  $('o-quality').textContent = QNAMES[st.quality];
-  $('o-full').textContent = document.fullscreenElement ? 'TẮT' : 'BẬT';
+  for (const k of ['music', 'sfx', 'vibrate']) { const b = $('o-' + k); b.textContent = tr(st[k] ? 'BẬT' : 'TẮT'); b.classList.toggle('on', st[k]); }
+  $('o-quality').textContent = tr(QNAMES[st.quality]);
+  $('o-full').textContent = tr(document.fullscreenElement ? 'TẮT' : 'BẬT');
+  $('o-lang').textContent = LANGS[getLang()];
   $('o-full').parentElement.classList.toggle('hidden', !document.documentElement.requestFullscreen);
 }
 for (const k of ['music', 'sfx', 'vibrate']) $('o-' + k).onclick = () => { S.settings[k] = !S.settings[k]; save(); A.setSound(S.settings); refreshSettings(); A.sfx('click'); };
@@ -107,10 +109,27 @@ $('o-quality').onclick = () => {
   refreshSettings(); A.sfx('click');
 };
 $('o-full').onclick = () => { toggleFullscreen(); setTimeout(refreshSettings, 300); };
+// Language: Vietnamese / English. The 3D labels are drawn into textures, so the scene is rebuilt.
+$('o-lang').onclick = () => {
+  S.settings.lang = getLang() === 'vi' ? 'en' : 'vi'; save();
+  applyLang();
+  view.worldKey = null;
+  if (world) view.load(world, theme(lvIdx)); else if (attractWorld) view.load(attractWorld, 'dawn');
+  if (world) updateHud(true);
+  A.sfx('click');
+};
+function applyLang() {
+  setLang(S.settings.lang ?? autoLang());
+  translatePage();
+  refreshSettings();
+  if (mode === 'title') $('b-play').textContent = tr(canContinue() ? `TIẾP TỤC · CHƯƠNG ${runLevel() + 1}` : 'CHƠI');
+  $('title-hint').textContent = tr(isTouch ? 'Cần gạt trái: chạy · ⤒ nhảy · 🐢 giữ để chạy chậm' : '←↑→↓ / WASD chạy · SPACE nhảy · giữ SHIFT chạy chậm · R chơi lại · ESC tạm dừng');
+  if (!$('s-select').classList.contains('hidden')) buildSelect();
+}
 let resetArm = 0;
 $('o-reset').onclick = () => {
-  if (Date.now() - resetArm > 2500) { resetArm = Date.now(); $('o-reset').textContent = 'CHẮC CHƯA?'; setTimeout(() => ($('o-reset').textContent = 'XÓA'), 2500); return; }
-  resetProgress(); resetArm = 0; $('o-reset').textContent = 'XÓA'; toast('Đã xóa tiến trình'); A.sfx('crack');
+  if (Date.now() - resetArm > 2500) { resetArm = Date.now(); $('o-reset').textContent = tr('CHẮC CHƯA?'); setTimeout(() => ($('o-reset').textContent = tr('XÓA')), 2500); return; }
+  resetProgress(); resetArm = 0; $('o-reset').textContent = tr('XÓA'); toast('Đã xóa tiến trình'); A.sfx('crack');
   if (world) goTitle(); // a reset from the pause menu ends the game in progress, or it would save into the fresh slate
 };
 function toggleFullscreen() {
@@ -165,7 +184,7 @@ function startLevel(i, intro, fromSelect = false, cp = 0, resume = false) {
   A.playMusic(STAGES[i].ch);
   if (intro) {
     const c = CHAPTERS[STAGES[i].ch];
-    $('chap-no').textContent = `CHƯƠNG ${STAGES[i].ch + 1}`; $('chap-name').textContent = c.name; $('chap-sub').textContent = c.sub;
+    $('chap-no').textContent = tr(`CHƯƠNG ${STAGES[i].ch + 1}`); $('chap-name').textContent = tr(c.name); $('chap-sub').textContent = tr(c.sub);
     show('s-chapter'); mode = 'chapter'; chapterT = 0;
   } else { show(null); mode = 'play'; }
 }
@@ -203,15 +222,15 @@ function onDeath() {
 }
 
 function showDeathCard() {
-  $('dead-head').textContent = HEAD[Math.floor(Math.random() * HEAD.length)];
-  $('dead-msg').textContent = deathText(world.cause);
+  $('dead-head').textContent = tr(HEAD[Math.floor(Math.random() * HEAD.length)]);
+  $('dead-msg').textContent = tr(deathText(world.cause));
   const same = causeCount[world.cause] || 1;
-  $('dead-sub').textContent = `Lần chết thứ ${S.run.deaths} · đồng hồ +1 phút` + (same > 1 ? ` · chết y chang ${same} lần rồi` : '');
-  $('dead-taunt').textContent = taunt(levelDeaths);
-  $('dead-tap').textContent = isTouch ? 'Chạm để thử lại' : 'Nhấn phím bất kỳ để thử lại';
+  $('dead-sub').textContent = tr(`Lần chết thứ ${S.run.deaths} · đồng hồ +1 phút`) + (same > 1 ? tr(` · chết y chang ${same} lần rồi`) : '');
+  $('dead-taunt').textContent = tr(taunt(levelDeaths));
+  $('dead-tap').textContent = tr(isTouch ? 'Chạm để thử lại' : 'Nhấn phím bất kỳ để thử lại');
   const grab = $('dead-grab');
   grab.classList.toggle('hidden', levelDeaths < 6 || (lvIdx >= STAGES.length - 1 && world.cp >= world.zones.length - 1));
-  grab.textContent = grabTried ? '🛵 GỌI GRAB LẠI (bỏ qua đoạn, +15 phút)' : '🛵 GỌI GRAB (bỏ qua đoạn)';
+  grab.textContent = tr(grabTried ? '🛵 GỌI XE ÔM LẠI (bỏ qua đoạn, +15 phút)' : '🛵 GỌI XE ÔM (bỏ qua đoạn)');
   $('c-dead').classList.remove('hidden');
   cardShown = true;
 }
@@ -232,12 +251,12 @@ function onClear() {
 }
 function onCheckpoint(d) {
   S.run.cp = d.zone; saveStage();
-  toast(`🚩 CHECKPOINT · ${d.name}`);
+  toast(tr('🚩 CHECKPOINT · ') + tr(d.name));
   updateHud(true);
 }
 function showClearCard() {
-  $('clear-head').textContent = 'QUA CHƯƠNG!';
-  $('clear-msg').textContent = stageDeaths() ? `Chương này chết ${stageDeaths()} lần` : 'Không chết lần nào?! Nghi lắm...';
+  $('clear-head').textContent = tr('QUA CHƯƠNG!');
+  $('clear-msg').textContent = tr(stageDeaths() ? `Chương này chết ${stageDeaths()} lần` : 'Không chết lần nào?! Nghi lắm...');
   $('c-clear').classList.remove('hidden');
   cardShown = true;
 }
@@ -256,11 +275,11 @@ $('dead-grab').onclick = (e) => {
   if (!grabTried) {
     grabTried = true; S.run.penalty = (S.run.penalty || 0) + 1; save();
     A.sfx('ring'); toast('🛵 Tài xế đã hủy chuyến. Lý do: "thấy mặt khách" (+1 phút)');
-    $('dead-grab').textContent = '🛵 GỌI GRAB LẠI (bỏ qua đoạn, +15 phút)';
+    $('dead-grab').textContent = tr('🛵 GỌI XE ÔM LẠI (bỏ qua đoạn, +15 phút)');
     return;
   }
   S.run.penalty = (S.run.penalty || 0) + 15; S.run.full = false; grabbed = true; saveStage();
-  toast('🛵 Grab chở qua đoạn này. Phí: 15 phút + lòng tự trọng');
+  toast('🛵 Xe ôm chở qua đoạn này. Phí: 15 phút + lòng tự trọng');
   // drops you at the next checkpoint (or at the next chapter)
   if (world.cp + 1 < world.zones.length) { S.run.cp = world.cp + 1; saveStage(); retry(world.cp + 1); updateHud(true); }
   else { onClear(); nextLevel(); }
@@ -274,17 +293,17 @@ function ending() {
   const full = !!S.run.full; // (finish count and record were already saved by onClear)
   S.run.level = STAGES.length; S.run.cp = 0;
   save();
-  $('end-time').textContent = `Tới công ty lúc ${fmt(m)}!`;
-  $('end-late').textContent = late > 0 ? `(trễ ${late} phút... bị trừ lương)` : 'Đúng giờ! Siêu nhân thật sự!';
-  $('end-stats').innerHTML = `💀 Số lần chết: <b>${S.run.deaths}</b>` + (S.bestRun != null ? ` · Kỷ lục: <b>${S.bestRun}</b>` : '') +
-    (full ? '' : '<br><small>(Lượt này có chọn chương hoặc gọi Grab nên không tính kỷ lục)</small>') +
-    `<br>Tổng cộng đã chết ${S.totalDeaths} lần trên đường đi làm.`;
+  $('end-time').textContent = tr(`Tới công ty lúc ${fmt(m)}!`);
+  $('end-late').textContent = tr(late > 0 ? `(trễ ${late} phút... bị trừ lương)` : 'Đúng giờ! Siêu nhân thật sự!');
+  $('end-stats').innerHTML = `${tr('💀 Số lần chết:')} <b>${S.run.deaths}</b>` + (S.bestRun != null ? `${tr(' · Kỷ lục:')} <b>${S.bestRun}</b>` : '') +
+    (full ? '' : `<br><small>${tr('(Lượt này có chọn chương hoặc gọi xe ôm nên không tính kỷ lục)')}</small>`) +
+    `<br>${tr(`Tổng cộng đã chết ${S.totalDeaths} lần trên đường đi làm.`)}`;
   show('s-end');
   A.sfx('win');
 }
 
 async function share() {
-  const text = `Mình vừa tới công ty lúc ${fmt(clockMin())} sau ${S.run.deaths} lần "toang" trong Traffic Hates You 🛵💀. Thử làm ít hơn xem!`;
+  const text = tr(`Mình vừa tới công ty lúc ${fmt(clockMin())} sau ${S.run.deaths} lần "toang" trong Traffic Hates You 🛵💀. Thử làm ít hơn xem!`);
   try {
     if (navigator.share) { await navigator.share({ title: 'Traffic Hates You', text, url: location.href }); return; }
     await navigator.clipboard.writeText(text + ' ' + location.href); toast('Đã chép, dán cho bạn bè nhé!');
@@ -390,7 +409,7 @@ function updateHud(force) {
   if (!world) return;
   if (force) for (const k in hudCache) delete hudCache[k];
   const st = STAGES[lvIdx], zn = world.zones.length;
-  setText('hud-level', `Chương ${st.id} · ${st.zones[world.cp].name} ${world.cp + 1}/${zn}`);
+  setText('hud-level', `${tr(`Chương ${st.id}`)} · ${tr(st.zones[world.cp].name)} ${world.cp + 1}/${zn}`);
   setText('hud-deaths', `💀 ${S.run.deaths}`);
   const m = clockMin();
   setText('hud-clock', `🕗 ${fmt(m)}`);
@@ -435,14 +454,14 @@ function tick(inp) {
 
 // The level-clear card, for a finish that isn't one.
 function showFakeClear() {
-  $('clear-head').textContent = 'QUA MÀN!';
-  $('clear-msg').textContent = levelDeaths ? `Đoạn này chết ${levelDeaths} lần` : 'Không chết lần nào?! Giỏi quá ta...';
+  $('clear-head').textContent = tr('QUA MÀN!');
+  $('clear-msg').textContent = tr(levelDeaths ? `Đoạn này chết ${levelDeaths} lần` : 'Không chết lần nào?! Giỏi quá ta...');
   $('c-clear').classList.remove('hidden');
   fakeAt = world.t;
 }
 function showCall(d) {
   const c = CALLS[d.who] ?? { who: d.who, s: d.s };
-  $('call-who').textContent = c.who; $('call-msg').textContent = d.s ?? c.s;
+  $('call-who').textContent = tr(c.who); $('call-msg').textContent = tr(d.s ?? c.s);
   $('call').classList.remove('hidden');
   callUntil = world.t + (d.dur ?? 120);
   if (S.settings.vibrate && navigator.vibrate) try { navigator.vibrate([80, 60, 80]); } catch (e) { /* ignore */ }
@@ -480,6 +499,7 @@ function loop(now) {
 
 /* ---------- boot ---------- */
 (async function boot() {
+  applyLang(); // Vietnamese for Vietnamese browsers, English for everyone else, unless chosen in Settings
   A.setSound(S.settings);
   try { await Promise.race([document.fonts.load("800 20px 'Baloo 2'"), new Promise(r => setTimeout(r, 2500))]); } catch (e) { /* ignore */ }
   goTitle();
