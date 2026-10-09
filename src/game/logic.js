@@ -444,9 +444,9 @@ function solidTileNear(w, x, z, r) {
 // A stage (a whole chapter as one map, see stages.js) has zones: attempts[zone] counts deaths per zone,
 // cp is the checkpoint (zone index) you start from.
 export const presentOn = (e, attempt) => (e.first ? attempt === 0 : true) && (e.retry ? attempt >= (e.n ?? 1) : true);
-export function makeWorld(def, { attempt = 0, attempts = null, cp = 0 } = {}) {
+export function makeWorld(def, { attempt = 0, attempts = null, rolls = null, cp = 0 } = {}) {
   const map = parseMap(def.map);
-  const ents = def.build(attempts ?? [], cp).filter(e => presentOn(e, attempts ? attempts[e.zone ?? 0] ?? 0 : attempt));
+  const ents = def.build(attempts ?? [], cp, rolls ?? []).filter(e => presentOn(e, attempts ? attempts[e.zone ?? 0] ?? 0 : attempt));
   const sp = def.zones?.[cp]?.spawn ?? { ...map.start, heading: Math.PI / 2 };
   const w = {
     def, map, ents, attempt, attempts, flags: {}, t: 0, status: 'play', cause: null, deadT: 0, clearT: 0, rain: !!def.rain, idle: 0,

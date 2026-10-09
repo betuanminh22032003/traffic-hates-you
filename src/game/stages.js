@@ -150,7 +150,7 @@ function buildStage(ci) {
       // where you come back after dying: the start for the first zone, else just past the previous checkpoint gate
       spawn: i === 0 ? { x: P(z.ox + s0[0]), z: P(z.oy + s0[1]), heading: 0 } : spawnOf(corridors[i - 1].cells, corridors[i - 1].cells.indexOf(corridors[i - 1].gate) + 1)
     })),
-    build: (attempts = [], cp = 0) => buildEnts(stage, attempts, cp)
+    build: (attempts = [], cp = 0, rolls = []) => buildEnts(stage, attempts, cp, rolls)
   };
   return stage;
 }
@@ -190,7 +190,8 @@ function shift(e, dx, dz) {
   return e;
 }
 // Zones you already got past keep only their scenery, so nothing chases you through an open gate.
-function buildEnts(stage, attempts, cp) {
+// attempts[z] = deaths inside zone z, rolls[z] = deaths in the alley before it; either one re-rolls that alley.
+function buildEnts(stage, attempts, cp, rolls = []) {
   const out = [];
   stage.zones.forEach((z, i) => {
     for (const e of z.level.build()) if (i >= cp || PASSIVE.has(e.k)) { e.zone = i; out.push(shift(e, z.ox * T, z.oy * T)); }
@@ -200,7 +201,7 @@ function buildEnts(stage, attempts, cp) {
     out.push({ k: 'cpgate', zone: i, x: gc * T, z: gr * T, w: T, d: T, dx: cor.dir[0], dz: cor.dir[1], label: stage.zones[i + 1].name });
     const sp = stage.zones[i + 1].spawn;
     out.push({ k: 'cpflag', zone: i + 1, x: sp.x, z: sp.z });
-    out.push(...alleyTraps(stage, cor, i + 1, attempts[i + 1] ?? 0));
+    out.push(...alleyTraps(stage, cor, i + 1, (attempts[i + 1] ?? 0) + 1009 * (rolls[i + 1] ?? 0)));
   });
   return out;
 }
