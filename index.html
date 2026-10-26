@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>Traffic Hates You</title>
-<meta name="description" content="Game troll-platformer 3D: chạy xe máy đi làm ở Sài Gòn trước 8:00. Ổ gà tàng hình, đèn đỏ troll, cột điện đổ, bà cụ qua đường... 4 chương, mỗi chương một bản đồ lớn liền mạch có checkpoint.">
+<meta name="description" content="Game troll-platformer 3D: chạy xe máy đi làm ở Hà Nội trước 8:00. Ổ gà tàng hình, đèn đỏ troll, cột điện đổ, bà cụ qua đường... 4 chương, mỗi chương một bản đồ lớn liền mạch có checkpoint.">
 <meta name="theme-color" content="#1b1612">
-<meta property="og:title" content="Traffic Hates You – bản Sài Gòn">
+<meta property="og:title" content="Traffic Hates You – bản Hà Nội">
 <meta property="og:description" content="Đi làm đúng giờ thôi mà. Dễ! (Không dễ đâu.)">
 <!-- absolute URLs: Facebook, Zalo and Messenger ignore relative ones -->
 <meta property="og:url" content="https://betuanminh22032003.github.io/traffic-hates-you/">
@@ -22,7 +22,7 @@
 <link rel="icon" href="./assets/icon-192-D82viFzQ.png">
 <link rel="apple-touch-icon" href="./assets/apple-touch-icon-KLJQvTsg.png">
 <link rel="manifest" href="./assets/manifest-Cv67rTyM.webmanifest">
-  <script type="module" crossorigin src="./assets/game-CYLiGnl-.js"></script>
+  <script type="module" crossorigin src="./assets/game-D82ME9mD.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/game-COYdVd_P.css">
 </head>
 <body>
@@ -52,9 +52,9 @@
   <div class="logo">
     <div class="l1">TRAFFIC</div>
     <div class="l2">HATES YOU</div>
-    <div class="l3">bản Sài Gòn · 3D</div>
+    <div class="l3">bản Hà Nội · 3D</div>
   </div>
-  <p class="tag">Nhiệm vụ: chạy xe máy tới công ty trước 8:00.</p>
+  <p class="tag">Nhiệm vụ: đi xe máy đến công ty trước 8:00.</p>
   <div class="menu">
     <button id="b-play" class="btn primary">CHƠI</button>
     <button id="b-new" class="btn hidden">CHƠI LẠI TỪ ĐẦU</button>
@@ -62,7 +62,7 @@
     <button id="b-settings" class="btn">CÀI ĐẶT</button>
   </div>
   <p class="hint" id="title-hint"></p>
-  <p class="foot">v3.1 · <a href="#" id="b-credits">Giới thiệu</a></p>
+  <p class="foot">v4.0 · <a href="#" id="b-credits">Giới thiệu</a></p>
 </section>
 
 <!-- level select -->
@@ -91,11 +91,12 @@
 <section id="s-credits" class="screen hidden">
   <h2>GIỚI THIỆU</h2>
   <div class="card text" data-i18n-html="credits">
-    <p><b>Traffic Hates You</b> là game "troll" về giao thông Sài Gòn. Mọi thứ trên đường đều ghét bạn: ổ gà, đèn đỏ, cột điện, chó, bà cụ, xe buýt, ô tô, cả cây xanh.</p>
-    <p>Chết là chuyện bình thường. Mỗi lần chết đồng hồ chạy thêm 1 phút. Tới công ty trước 8:00 là thắng... chắc vậy.</p>
+    <p><b>Traffic Hates You</b> là game "troll" về giao thông Hà Nội. Mọi thứ trên đường đều ghét bạn: ổ gà, đèn đỏ, cột điện, chó, bà cụ, xe buýt, ô tô, cả cây xanh.</p>
+    <p>Chết là chuyện bình thường. Mỗi lần chết đồng hồ chạy thêm 1 phút. Đến công ty trước 8:00 là thắng... chắc vậy.</p>
     <p><b>Điều khiển:</b> ←↑→↓ / WASD chạy 8 hướng (giữ lâu thì ga lên dần tới ~68 km/h, nhả ra là phanh) · giữ <b>Shift</b> để chạy chậm (~34 km/h) · Space nhảy · R chơi lại từ checkpoint · Esc tạm dừng. Điện thoại: kéo cần gạt bên trái (kéo nhẹ = chạy chậm), ⤒ nhảy, 🐢 giữ để chạy chậm. Hỗ trợ tay cầm (A nhảy, B/LB/RB chạy chậm).</p>
     <p><b>Bản đồ:</b> mỗi chương là một bản đồ lớn. Về đích một khu thì cổng 🚩 checkpoint mở ra; chết thì quay lại checkpoint gần nhất.</p>
-    <p><b>Mẹo:</b> chết một lần là nhớ... nhưng bẫy cũng nhớ bạn. Có bẫy chỉ xuất hiện lần đầu, có bẫy chỉ xuất hiện sau khi bạn chết. Còn bẫy trong hẻm thì mỗi lần một kiểu, không báo trước.</p>
+    <p><b>Mẹo:</b> chết một lần là nhớ... nhưng bẫy cũng nhớ bạn. Có bẫy chỉ xuất hiện lần đầu, có bẫy chỉ xuất hiện sau khi bạn chết. Còn bẫy trong ngõ thì mỗi lần một kiểu, không báo trước.</p>
+    <p><b>Phố thật:</b> mọi khu trong game là một khúc phố thật của Hà Nội, từ ngõ Khương Trung tới Hồ Gươm, cắt từ bản đồ mở OpenStreetMap. Dữ liệu bản đồ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, giấy phép ODbL.</p>
     <p class="dim">Mọi nhân vật và sự kiện là hư cấu. Hãy đội mũ bảo hiểm và tuân thủ luật giao thông ngoài đời thật nhé.</p>
   </div>
   <button class="btn back" data-back>← QUAY LẠI</button>
@@ -116,7 +117,7 @@
 <!-- chapter intro -->
 <section id="s-chapter" class="screen dim hidden">
   <div class="chap-no" id="chap-no">CHƯƠNG 1</div>
-  <div class="chap-name" id="chap-name">Hẻm Nhỏ</div>
+  <div class="chap-name" id="chap-name">Ngõ Nhỏ</div>
   <div class="chap-sub" id="chap-sub"></div>
 </section>
 
