@@ -207,6 +207,8 @@ const V = {
       rider = MD.makeRider(e.behind ? RIDERS.ninja : RIDERS.onc); inner.add(rider.g);
     } else if (e.kind === 'cart') {
       inner.add(MD.makeCart().g);
+    } else if (e.kind === 'train') {
+      g.add(MD.makeTrain(e.len, e.top));
     } else if (e.kind === 'bus') {
       const b = MD.makeBus(e.len, e.top - 4); b.g.position.x = -e.len / 2; b.g.scale.z = e.wid / 110; inner.add(b.g); wheels = b.wheels;
     } else {
@@ -589,8 +591,9 @@ V.cpgate = (e) => {
   };
 };
 V.deco = (e) => {
-  const g = e.kind === 'thaprua' ? MD.makeThapRua() : new THREE.Group();
+  const g = e.kind === 'thaprua' ? MD.makeThapRua() : e.kind === 'street' ? MD.makeStreetSign(e.label ?? '') : new THREE.Group();
   g.position.set(e.x, e.y ?? 0, e.z);
+  if (e.kind === 'street') return { obj: g, update(e, w, t, dt, ctx) { if (ctx?.cam) g.userData.plate.rotation.y = Math.atan2(ctx.cam.position.x - e.x, ctx.cam.position.z - e.z); } };
   return { obj: g };
 };
 V.cpflag = (e) => {

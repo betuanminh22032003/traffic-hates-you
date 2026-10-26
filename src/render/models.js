@@ -317,6 +317,34 @@ export function makeBoat(w = 120) {
   return g;
 }
 
+// A Vietnam Railways train (blue, white band, red stripe), built along +X like the bus. One carriage per ~140 px.
+export function makeTrain(len = 560, h = 120) {
+  const g = new THREE.Group();
+  const n = Math.max(1, Math.round(len / 140)), cl = len / n - 8;
+  for (let i = 0; i < n; i++) {
+    const x = -len / 2 + i * (len / n) + (len / n) / 2;
+    g.add(part(box(cl, h - 30, 88), '#2d5fa8', { pos: [x, 30 + (h - 30) / 2, 0] }));
+    g.add(part(box(cl, 14, 90), '#eef0f2', { pos: [x, 62, 0], outline: false }));
+    g.add(part(box(cl, 5, 91), '#d8322c', { pos: [x, 52, 0], outline: false }));
+    g.add(part(box(cl - 10, 8, 80), '#1f3f73', { pos: [x, h + 4, 0], outline: false }));
+    for (let k = -1; k <= 1; k++) for (const s of [-1, 1]) g.add(part(box(22, 18, 2), '#9fd3ff', { pos: [x + k * cl / 3.2, 82, s * 45], outline: false }));
+    for (const wx of [-cl / 3, cl / 3]) for (const s of [-1, 1]) g.add(part(cyl(12, 12, 6, 12), '#333', { pos: [x + wx, 12, s * 34], rot: [Math.PI / 2, 0, 0], outline: false }));
+  }
+  g.add(part(box(16, 40, 60), '#f4d35e', { pos: [len / 2 + 2, 30, 0] }));
+  return g;
+}
+
+// Hanoi street-name sign: a white plate with blue text on a pole.
+export function makeStreetSign(label) {
+  const g = new THREE.Group();
+  g.add(part(cyl(2.5, 2.5, 150, 8), '#b9bec4', { pos: [0, 75, 0] }));
+  const tex = signTex(label.toUpperCase(), { w: 512, h: 96, bg: '#f4f6f8', fg: '#1d4ea8', size: 44, border: true });
+  const plate = part(box(150, 28, 3), texMat(tex), { pos: [0, 150, 0], outline: true });
+  g.add(plate);
+  g.userData.plate = plate;
+  return g;
+}
+
 // Tháp Rùa: the little tower on its island in the middle of Hồ Gươm.
 export function makeThapRua() {
   const g = new THREE.Group();

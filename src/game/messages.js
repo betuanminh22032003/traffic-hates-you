@@ -11,6 +11,8 @@ export const DEATH = {
   bus: ['Xe buýt không nhường ai. Chưa bao giờ.', 'Xe buýt số 32 ép sát lề. Đúng lịch trình.'],
   flood: ['Chết máy giữa biển nước. Dắt bộ về thôi.', 'Nước vào bô-bin. Xe đề không nổ nữa.', 'Ngập đến yên xe. Hà Nội mùa này phố cũng như sông.'],
   lake: ['Rơi xuống Hồ Gươm. Cụ Rùa lắc đầu.', 'Phóng thẳng xuống Hồ Gươm. Ít ra là có view Tháp Rùa.', 'Hồ Gươm không phải bãi đỗ xe.'],
+  river: ['Rơi xuống sông Tô Lịch. Mùi thì... thôi khỏi tả.', 'Tắm Tô Lịch miễn phí. Xe thì hết cứu.', 'Sông Tô Lịch đen như cà phê. Không uống được đâu.'],
+  train: ['Tàu Thống Nhất không phanh vì bạn. Chưa bao giờ.', 'Đứng giữa đường ray chụp ảnh? Tàu không đợi đâu.'],
   gate: ['Đâm vào cổng công ty. Bảo vệ: "Nói rồi mà!"'],
   truck: ['Xe tải chuyển nhà 24/7. Chuyển luôn bạn.', 'Xe tải chạy giờ cấm. Tài xế: "Anh có quen người."'],
   car: ['Ô tô lùi không nhìn gương. "Ơ, có người à?"', 'Ô tô đỗ giữa đường còn lùi. Đẳng cấp.'],

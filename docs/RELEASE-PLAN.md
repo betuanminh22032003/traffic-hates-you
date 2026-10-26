@@ -6,7 +6,7 @@
 
 Game có ba đặc điểm quyết định chọn nền tảng:
 
-- **Tiếng Việt và tiếng Anh, bối cảnh Hà Nội** (từ v3.2; trước đó là Sài Gòn). Người chơi hợp nhất là người Việt; từ bản v3.1 đã có tiếng Anh (tự chọn theo trình duyệt) để lên các cổng game nước ngoài.
+- **Tiếng Việt và tiếng Anh, bối cảnh Hà Nội thật** (từ v4.0 mọi khu là phố thật từ OpenStreetMap; v3.2 đổi bối cảnh từ Sài Gòn sang Hà Nội). Người chơi hợp nhất là người Việt; từ bản v3.1 đã có tiếng Anh (tự chọn theo trình duyệt) để lên các cổng game nước ngoài.
 - **Chạy trên web (HTML5), nhẹ (~2 MB), có offline, có điều khiển cảm ứng.** Đăng lên web gần như không tốn gì; lên app store thì phải đóng gói thêm.
 - **Thể loại rage game "chết là cười".** Loại này lan truyền nhờ clip ngắn (TikTok, Reels, YouTube Shorts) hơn là nhờ người ta lướt cửa hàng ứng dụng.
 

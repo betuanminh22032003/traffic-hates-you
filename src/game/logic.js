@@ -21,7 +21,7 @@ const speedOf = p => Math.hypot(p.vx, p.vz);
 /* ---------- map ---------- */
 // '#' house, 'T' tree, 'K' kiosk/wall  -> solid
 // '=' road, '.' pavement, ',' grass, 'S' start, 'F' finish -> floor
-// '~' flood water (slow, the engine dies if you stay) ; ' ' canal / pit -> fall ; 'H' lake (Hồ Gươm) -> fall too
+// '~' flood water (slow, the engine dies if you stay) ; ' ' canal / pit -> fall ; 'H' lake (Hồ Gươm) and 'R' river (Tô Lịch) -> fall too
 const SOLID = new Set(['#', 'T', 'K', 'X']); // X: road barrier at the end of a street
 export function parseMap(rows) {
   const H = rows.length, W = Math.max(...rows.map(r => r.length));
@@ -39,7 +39,7 @@ export function tileAt(m, x, z) {
   return m.cells[r][c];
 }
 export const isSolidTile = ch => SOLID.has(ch);
-export const isVoidTile = ch => ch === ' ' || ch === 'H';
+export const isVoidTile = ch => ch === ' ' || ch === 'H' || ch === 'R';
 
 function die(w, cause, ev) {
   if (w.status !== 'play') return;
@@ -106,7 +106,7 @@ export const KINDS = {
   mover: {
     init(e) {
       e.kind ??= 'car'; e.speed ??= 6; e.on = false; e.t = 0; e.cx = e.x; e.cz = e.z; e.range ??= 1400; e.travel = 0;
-      const S = { car: [140, 80, 58], bike: [66, 26, 54], bus: [260, 100, 96], cart: [74, 54, 64], truck: [210, 100, 92] }[e.kind];
+      const S = { car: [140, 80, 58], bike: [66, 26, 54], bus: [260, 100, 96], cart: [74, 54, 64], truck: [210, 100, 92], train: [560, 90, 120] }[e.kind];
       e.len ??= S[0]; e.wid ??= S[1]; e.top ??= S[2];
     },
     update(w, e, dt, ev) {
@@ -540,7 +540,7 @@ function updPlayer(w, inp, dt, ev) {
 
   p.water = p.onGround && !p.onPlat && p.h < 1 && tileAt(w.map, p.x, p.z) === '~';
   if (p.water) { p.wt += dt; if (p.wt > 80) die(w, 'flood', ev); } else p.wt = 0;
-  if (p.h < -170) die(w, tileAt(w.map, p.x, p.z) === 'H' ? 'lake' : 'fall', ev);
+  if (p.h < -170) { const u = tileAt(w.map, p.x, p.z); die(w, u === 'H' ? 'lake' : u === 'R' ? 'river' : 'fall', ev); }
   if (p.h + PH > WIRE_H) die(w, p.launched ? 'bump' : 'zap', ev);
   if (p.onGround) p.launched = false;
   const sp2 = speedOf(p);

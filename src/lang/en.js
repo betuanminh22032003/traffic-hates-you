@@ -48,6 +48,7 @@ export default {
     <p><b>Controls:</b> ←↑→↓ / WASD ride in 8 directions (hold to throttle up to ~68 km/h, let go to brake) · hold <b>Shift</b> to go slow (~34 km/h) · Space jump · R restart from the checkpoint · Esc pause. Phone: drag the stick on the left (a short drag = slow), ⤒ jump, hold 🐢 to go slow. Gamepads work too (A jump, B/LB/RB go slow).</p>
     <p><b>The map:</b> every chapter is one big map. Reach the end of a zone and its 🚩 checkpoint gate opens; die and you are back at the last checkpoint.</p>
     <p><b>Tip:</b> die once and you remember... but so do the traps. Some only show up on your first try, some only after you die. The traps in the alleys are different every time, and they never warn you.</p>
+    <p><b>Real streets:</b> every zone is a real patch of Hanoi, from the alleys of Khương Trung to Hoàn Kiếm Lake, cut from OpenStreetMap. Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, ODbL.</p>
     <p class="dim">All characters and events are fictional. Wear a helmet and follow the traffic rules in real life.</p>`,
 
   /* ---------- chapters, zones, HUD ---------- */
@@ -76,6 +77,20 @@ export default {
   'Công Trình': 'Construction Site',
   'Bãi Giữ Xe': 'Parking Lot',
   '{n}:{n} Sáng': '{n}:{n} AM',
+  'Ngõ Khương Trung': 'Khuong Trung Alleys',
+  'Ngõ Vương Thừa Vũ': 'Vuong Thua Vu Alleys',
+  'Đèn Đỏ Nguyễn Trãi': 'Nguyen Trai Red Light',
+  'Chợ Ngã Tư Sở': 'Nga Tu So Market',
+  'Đường Láng': 'Lang Road',
+  'Phố Tây Sơn': 'Tay Son Street',
+  'Ô Chợ Dừa': 'O Cho Dua',
+  'Khâm Thiên': 'Kham Thien',
+  'Lê Duẩn': 'Le Duan',
+  'Nguyễn Khuyến': 'Nguyen Khuyen',
+  'Phan Đình Phùng': 'Phan Dinh Phung',
+  'Chợ Đồng Xuân': 'Dong Xuan Market',
+  'Hàng Đào': 'Hang Dao',
+  'Bờ Hồ': 'The Lakeside',
   '💀 ít nhất {n}': '💀 best: {n}',
   '{n} checkpoint · chưa qua': '{n} checkpoints · not cleared',
   '🚩 CHECKPOINT · ': '🚩 CHECKPOINT · ',
@@ -186,6 +201,29 @@ export default {
   'Hồ Gươm không phải bãi đỗ xe.': 'The lake is not a parking lot.',
   'Ngập đến yên xe. Hà Nội mùa này phố cũng như sông.': 'Water up to the seat. Hanoi streets turn into rivers this season.',
   'Hồ Gươm 🐢 đừng phóng xuống': 'Hoan Kiem Lake 🐢 do not drive in',
+  'Rơi xuống sông Tô Lịch. Mùi thì... thôi khỏi tả.': 'Fell into the To Lich river. The smell... let\'s not.',
+  'Tắm Tô Lịch miễn phí. Xe thì hết cứu.': 'A free bath in the To Lich. The scooter is gone, though.',
+  'Sông Tô Lịch đen như cà phê. Không uống được đâu.': 'The To Lich is as black as coffee. Do not drink it.',
+  'Tàu Thống Nhất không phanh vì bạn. Chưa bao giờ.': 'The Reunification Express does not brake for you. Never has.',
+  'Đứng giữa đường ray chụp ảnh? Tàu không đợi đâu.': 'Posing on the tracks? The train does not wait.',
+  'Rẽ phải đây →': 'Turn right here →',
+  'VƯƠNG THỪA VŨ': 'VUONG THUA VU ST',
+  'NGUYỄN TRÃI': 'NGUYEN TRAI RD',
+  'NGÃ TƯ SỞ': 'NGA TU SO',
+  'ĐƯỜNG LÁNG': 'LANG ROAD',
+  'TÂY SƠN': 'TAY SON ST',
+  'Ô CHỢ DỪA': 'O CHO DUA',
+  'KHÂM THIÊN': 'KHAM THIEN ST',
+  'LÊ DUẨN': 'LE DUAN RD',
+  'NGUYỄN KHUYẾN': 'NGUYEN KHUYEN ST',
+  'PHAN ĐÌNH PHÙNG': 'PHAN DINH PHUNG ST',
+  'HÀNG ĐÀO': 'HANG DAO ST',
+  'BỜ HỒ': 'THE LAKE',
+  'Nhảy liên tục cho khỏi ướt bô-bin': 'Keep hopping so the ignition stays dry',
+  'Tàu Thống Nhất chạy giữa phố 🚆': 'The train runs right down the street 🚆',
+  'Phố thành sông rồi. Nhảy liên tục, đừng ngâm nước!': 'The street is a river now. Keep hopping, do not soak!',
+  'Phan Đình Phùng. Cây sấu đẹp thế.': 'Phan Dinh Phung. Such lovely dracontomelon trees.',
+  'Sắp tới rồi! Bờ Hồ ở ngay kia ↓': 'Almost there! The lake is right over there ↓',
   'Thấy chữ CÔNG TY là lao vào. Ngây thơ quá.': 'You saw the word OFFICE and ran in. So innocent.',
 
   /* ---------- taunts and troll calls ---------- */

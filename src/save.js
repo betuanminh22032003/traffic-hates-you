@@ -1,6 +1,6 @@
 // Progress + settings in localStorage. Every access is guarded: private mode / blocked storage
 // just means progress lives for this session only.
-const KEY = 'traffic-hates-you:v2'; // v2: one big map per chapter (ids are chapters, not levels)
+const KEY = 'traffic-hates-you:v3'; // v3: the real-Hanoi zones (v2 was one big map per chapter of hand-drawn zones)
 
 const clone = v => JSON.parse(JSON.stringify(v));
 
@@ -24,8 +24,8 @@ function load() {
       const d = JSON.parse(raw);
       return { ...clone(DEFAULT), ...d, settings: { ...DEFAULT.settings, ...(d.settings || {}) }, run: { ...clone(DEFAULT.run), ...(d.run || {}) } };
     }
-    // coming from v1 (15 separate levels): keep the settings and the death count, progress starts over
-    const old = JSON.parse(localStorage.getItem('traffic-hates-you:v1') || 'null');
+    // coming from an older save: keep the settings and the death count, progress starts over
+    const old = JSON.parse(localStorage.getItem('traffic-hates-you:v2') || localStorage.getItem('traffic-hates-you:v1') || 'null');
     if (old) return { ...clone(DEFAULT), totalDeaths: old.totalDeaths || 0, settings: { ...DEFAULT.settings, ...(old.settings || {}) } };
   } catch (e) { /* ignore */ }
   return clone(DEFAULT);

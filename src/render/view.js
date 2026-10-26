@@ -77,7 +77,9 @@ export class View {
     const key = world.def.id + ':' + theme + ':' + this.quality + ':' + holes;
     if (key !== this.worldKey) {
       if (this.world) { this.scene.remove(this.world.root); this.world.dispose(); }
+      const t0 = performance.now();
       this.world = buildWorld(world.def, world.ents, theme, world.map);
+      this.stats = { bakeMs: Math.round(performance.now() - t0) }; // debug: how long the city took to build
       this.scene.add(this.world.root);
       this.worldKey = key;
       const th = THEMES[theme];

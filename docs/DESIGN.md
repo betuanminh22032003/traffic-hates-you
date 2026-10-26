@@ -1,4 +1,4 @@
-# Traffic Hates You v2: tài liệu thiết kế
+# Traffic Hates You: tài liệu thiết kế
 
 ## 1. Vấn đề của bản v1 (phản hồi người chơi)
 
@@ -89,3 +89,14 @@ Phản hồi: "làm bối cảnh Hà Nội đi, thật như bản đồ thật t
 - **Bối cảnh Hà Nội.** Đường đi làm: ngõ ở Thanh Xuân → Ngã Tư Sở, đường trên cao, sông Tô Lịch tràn bờ, Ô Chợ Dừa → mưa, phố thành sông (nhảy qua thùng xốp thay cho thúng), Công viên Thống Nhất → Hoàn Kiếm, văn phòng ngay Bờ Hồ. Khu cuối có **Hồ Gươm** (ô `H`, phóng xuống là chết với thẻ chết riêng: "Cụ Rùa lắc đầu") và **Tháp Rùa** giữa hồ (`deco`).
 - **Giọng Bắc.** Toàn bộ lời thoại đổi từ giọng Nam sang Bắc: hẻm → ngõ, quẹo → rẽ, nha/nè → nhé/này, hả/Ủa → à/Ơ, trễ → muộn, máy lạnh → điều hòa, tiệm → hàng, chậu mai → chậu quất, mẹ dặn mua xôi xéo, xe buýt 32. Biển hiệu phố: bún chả, bún đậu, bia hơi, photocopy, vàng bạc. Bản tiếng Anh đổi địa danh theo.
 - **Phố thật.** `scripts/osm-import.mjs` lấy đường, nhà, công viên, hồ, cây của một khung tọa độ từ OpenStreetMap và vẽ thành bản đồ ô đúng ký hiệu của game (xem README). Giữ nguyên cách làm màn: hình dáng phố lấy từ bản đồ, còn bẫy và lời giải cho bot vẫn đặt tay, vì mỗi cái chết phải học được và `npm test` vẫn phải chứng minh màn qua được. Các khu hiện tại vẫn là bản vẽ tay; dùng công cụ này để thay dần từng khu bằng khúc phố thật (gợi ý: Ngã Tư Sở cho khu 6, Hàng Đào–Hàng Ngang cho chương 4).
+
+## 9. v4.0: 15 khu phố thật từ OpenStreetMap
+
+Phản hồi: "yêu cầu phải có map thật, tôi cần chân thực".
+
+- **Dữ liệu.** Môi trường làm bản này không gọi được Overpass, nên lấy cache Overpass cho toàn Hà Nội từ bản phát hành `data-v1` của repo `tuandat07032007-rgb/hanoi-graph` (cùng dữ liệu OpenStreetMap, chỉ có đường; không có nhà, hồ, cây). `scripts/osm-import.mjs` được nâng cấp để đọc way dạng danh sách node, gộp nhiều file cache theo khung, vẽ sông men theo phố (`--along`), đổ nước vào hồ bọc bởi phố (`--fill`), trồng hàng cây (`--trees`), sơn nước ngập chỉ lên mặt đường (`--paint`), bỏ cầu và đường trên cao, và chọn `S`/`F` trong phần phố liên thông lớn nhất.
+- **Bản đồ sinh ra, bẫy đặt tay.** `scripts/build-hanoi.mjs` giữ 15 khung tọa độ theo đúng đường đi làm (Khương Trung → Ngã Tư Sở → Đường Láng → Tây Sơn → Ô Chợ Dừa → Khâm Thiên → Lê Duẩn → Nguyễn Khuyến → Phan Đình Phùng → Chợ Đồng Xuân → Hàng Đào → Bờ Hồ) và sinh `src/game/hanoi-maps.js` (đã commit). `levels.js` chỉ còn bẫy, đặt theo tọa độ ô trên từng khúc phố, xem bằng `scripts/viewzone.mjs`. Biển tên phố (`deco` kiểu `street`) tự sinh từ tên trong dữ liệu, dựng cạnh tường ở giữa phố.
+- **Ô mới:** `R` sông (Tô Lịch, rơi là chết), mover `train` (tàu Thống Nhất chạy dọc Lê Duẩn). Hồ Gươm là `H` đổ từ vòng phố Đinh Tiên Hoàng – Lê Thái Tổ – Hàng Khay; Tháp Rùa đặt đúng tọa độ thật.
+- **Bot chung thay cho lời giải kịch bản.** Khu phố thật rộng 20–50 ô, nhiều ngõ, nên viết lời giải tay cho từng khu không còn hợp lý. `scripts/autobot.mjs` tìm đường (Dijkstra trên ô, cộng phí cho nắp cống, nhớt, đinh, gờ, vật cản thấp; chặn vật cản cao) và phản ứng với mọi loại bẫy: nhảy ổ gà/đinh/nắp cống/vật đã rơi, đợi đèn đỏ/bà cụ/cành cây/xe cắt ngang/tàu, dừng và nhảy khi ninja từ sau lưng, lách dép, chạy khỏi chỗ vật sắp rơi, chậm trước camera và gờ, nhảy liên tục qua nước ngập, đi đích giả rồi lùi ra khi cục nóng rơi. `npm test` chạy bot này cho 15 khu (lần đầu và sau khi bẫy đổi) và cho mọi ngõ nối. Bẫy nào bot không hiểu thì vẫn có thể viết lời giải kịch bản vào `solutions.mjs`.
+- **Hiệu năng.** Bản đồ chương giờ 140–230 ô ngang; nhà sâu quá 7 ô tính từ mặt phố và nền đất dưới nhà xa phố không dựng nữa (không bao giờ lọt vào khung hình), giảm 30% số tam giác; thời gian dựng cảnh đo được 2–4 s trên máy chậm (`__thy.view.stats.bakeMs`).
+- **Chưa làm:** ngõ nối giữa các khu vẫn là ngõ sinh tự động (để giữ bẫy ngẫu nhiên), chưa phải phố thật; nhà, hồ, cây ngoài những chỗ đặt tay không có trong dữ liệu đường bộ, nên khối nhà là nhà ống sinh ngẫu nhiên.
