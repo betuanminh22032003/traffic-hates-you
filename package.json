@@ -1,14 +1,16 @@
 {
   "name": "traffic-hates-you",
-  "version": "3.1.0",
+  "version": "4.0.0",
   "private": true,
-  "description": "Traffic Hates You – game troll-platformer 3D: chạy xe máy đi làm ở Sài Gòn.",
+  "description": "Traffic Hates You – game troll-platformer 3D: chạy xe máy đi làm ở Hà Nội.",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/publish-root.mjs",
     "preview": "vite preview",
-    "test": "node scripts/mechanics.mjs && node scripts/smoke-test.mjs && node scripts/stage-test.mjs && node scripts/i18n-test.mjs",
+    "test": "node scripts/mechanics.mjs && node scripts/smoke-test.mjs && node scripts/stage-test.mjs && node scripts/i18n-test.mjs && node scripts/osm-test.mjs",
+    "osm": "node scripts/osm-import.mjs",
+    "hanoi": "node scripts/build-hanoi.mjs",
     "icons": "node scripts/make-icons.mjs"
   },
   "dependencies": {

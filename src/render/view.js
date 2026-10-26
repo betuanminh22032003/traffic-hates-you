@@ -1,7 +1,7 @@
 // Renderer: owns the three.js scene, the fixed high 3/4 camera (Trees-Hate-You style), player model,
 // particles and the 2D overlay (speech bubbles, off-screen traffic warnings). Reads logic state, never mutates it.
 import * as THREE from 'three';
-import { T, tileAt } from '../game/logic.js';
+import { T, tileAt, isVoidTile } from '../game/logic.js';
 import { settings, disposeTree, fontPx } from './toon.js';
 import { makeRider } from './models.js';
 import { buildWorld, THEMES } from './world.js';
@@ -77,7 +77,9 @@ export class View {
     const key = world.def.id + ':' + theme + ':' + this.quality + ':' + holes;
     if (key !== this.worldKey) {
       if (this.world) { this.scene.remove(this.world.root); this.world.dispose(); }
+      const t0 = performance.now();
       this.world = buildWorld(world.def, world.ents, theme, world.map);
+      this.stats = { bakeMs: Math.round(performance.now() - t0) }; // debug: how long the city took to build
       this.scene.add(this.world.root);
       this.worldKey = key;
       const th = THEMES[theme];
@@ -152,7 +154,7 @@ export class View {
     const moving = Math.hypot(p.vx, p.vz) > 0.5;
     pl.r.lean(w.status === 'play' && moving ? 0.1 : 0);
     const ground = tileAt(w.map, px, pz);
-    const overHole = ph < -2 || ground === ' ' || w.ents.some(e => e.k === 'hole' && e.open && px > e.x + 6 && px < e.x + e.w - 6 && pz > e.z + 6 && pz < e.z + e.d - 6);
+    const overHole = ph < -2 || isVoidTile(ground) || w.ents.some(e => e.k === 'hole' && e.open && px > e.x + 6 && px < e.x + e.w - 6 && pz > e.z + 6 && pz < e.z + e.d - 6);
     pl.blob.visible = !settings.shadows && !overHole && w.status !== 'dead';
     if (pl.blob.visible) { const gy = p.onPlat ? ph : 0, hh = Math.max(0, ph - gy); pl.blob.position.set(px, gy + 0.8, pz); pl.blob.scale.setScalar(Math.max(0.4, 1 - hh / 250)); }
     if (w.status === 'dead') { pl.tumble.position.y = 30; pl.r.g.position.y = -30; pl.tumble.rotation.z = -p.spin; pl.tumble.rotation.x = 0; }
@@ -245,7 +247,7 @@ export class View {
     if (this.flash > 0) { c.fillStyle = `rgba(255,255,255,${this.flash})`; c.fillRect(0, 0, this.W, this.H); }
     // stand around too long and the game nags you
     if (w.status === 'play' && w.idle > 300 && !this.attractMode) {
-      const NAG = ['Đứng đây chi? Trễ giờ rồi!', 'Sếp đang đếm từng phút đó...', 'Sợ hả? 🐔', 'Đi đi, bẫy không cắn đâu. (Có cắn.)'];
+      const NAG = ['Đứng đây làm gì? Muộn giờ rồi!', 'Sếp đang đếm từng phút đấy...', 'Sợ à? 🐔', 'Đi đi, bẫy không cắn đâu. (Có cắn.)'];
       const [sx, sy] = this.toScreen(w.p.x, 110, w.p.z);
       bubble(c, NAG[Math.floor(w.idle / 240) % NAG.length], sx, sy, 14 * s);
     }

@@ -1,7 +1,7 @@
 // 3D views for logic entities. Each factory returns { obj, update(e, w, t, dt), bubble?(e, w, t), billboard?, sparks?, mover? }.
 // Logic: x right, z toward the camera, h up. World: X = x, Y = h, Z = z (1:1).
 import * as THREE from 'three';
-import { T, tileAt, isSolidTile } from '../game/logic.js';
+import { T, tileAt, isSolidTile, isVoidTile } from '../game/logic.js';
 import { part, box, cyl, ico, sph, M, textPlane, canvasTex, texMat, signTex } from './toon.js';
 import * as MD from './models.js';
 import { groundMat } from './world.js';
@@ -24,7 +24,7 @@ const cracks = () => (crackTex ??= canvasTex(128, 128, (c) => {
 // A free (walkable) spot just outside a rect's corners, for poles, cops and shops standing next to a trap.
 function besideRect(map, e, off = 22) {
   const c = [[e.x - off, e.z - off], [e.x + e.w + off, e.z - off], [e.x - off, e.z + e.d + off], [e.x + e.w + off, e.z + e.d + off]];
-  for (const [x, z] of c) { const ch = tileAt(map, x, z); if (!isSolidTile(ch) && ch !== ' ') return [x, z]; }
+  for (const [x, z] of c) { const ch = tileAt(map, x, z); if (!isSolidTile(ch) && !isVoidTile(ch)) return [x, z]; }
   return [e.x + 8, e.z + 8];
 }
 // Long axis of a rect: a model built along +X gets this length, width and yaw.
@@ -128,7 +128,7 @@ const V = {
       bubble(e, w) {
         if (e.caught) return B('TẤP VÀO!', kx, 110, kz, 16);
         if (e.st === 'red' && Math.hypot(w.p.vx, w.p.vz) > 0.35) return B('Dừng hẳn lại!', kx, 110, kz, 14);
-        if (e.st === 'fake') return B('Xanh rồi... hả?', kx, 110, kz, 14);
+        if (e.st === 'fake') return B('Xanh rồi... à?', kx, 110, kz, 14);
       }
     };
   },
@@ -207,6 +207,8 @@ const V = {
       rider = MD.makeRider(e.behind ? RIDERS.ninja : RIDERS.onc); inner.add(rider.g);
     } else if (e.kind === 'cart') {
       inner.add(MD.makeCart().g);
+    } else if (e.kind === 'train') {
+      g.add(MD.makeTrain(e.len, e.top));
     } else if (e.kind === 'bus') {
       const b = MD.makeBus(e.len, e.top - 4); b.g.position.x = -e.len / 2; b.g.scale.z = e.wid / 110; inner.add(b.g); wheels = b.wheels;
     } else {
@@ -227,12 +229,12 @@ const V = {
       bubble(e) {
         if (!e.on) return;
         const y = e.top + 40;
-        if (e.stopped) return e.kind === 'bus' ? B('Hết giờ chạy!', e.cx, y, e.cz, 14) : B('Đỗ đây tí nha', e.cx, y, e.cz, 13);
+        if (e.stopped) return e.kind === 'bus' ? B('Hết giờ chạy!', e.cx, y, e.cz, 14) : B('Đỗ đây tí nhé', e.cx, y, e.cz, 13);
         if (e.t < 70) {
           if (e.say) return B(e.say, e.cx, y, e.cz, 14);
           // traffic doesn't warn you any more; only the bus and the cart still talk
           if (e.kind === 'bus') return B('Lên xe không?', e.cx, y, e.cz, 14);
-          if (e.kind === 'cart') return B('Bánh mì nóng giòn!', e.cx, y, e.cz, 14);
+          if (e.kind === 'cart') return B('Bánh mì nóng giòn đây!', e.cx, y, e.cz, 14);
         }
       }
     };
@@ -273,7 +275,7 @@ const V = {
       },
       bubble(e, w) {
         if (e.after && !w.flags['fake' + (e.zone ?? 0)]) return;
-        if (e.after && w.flags['fake' + (e.zone ?? 0)] && !e.ran) return B('Đích thật ở đây nè 🙂', e.x, 190, e.z, 14);
+        if (e.after && w.flags['fake' + (e.zone ?? 0)] && !e.ran) return B('Đích thật ở đây này 🙂', e.x, 190, e.z, 14);
         if (e.moving) return B('hehe 😜', e.x, 190, e.z, 15);
         if (e.ran) return B('ok ok, vào đi', e.x, 190, e.z, 14);
       }
@@ -289,7 +291,7 @@ const V = {
     return {
       obj: g,
       update(e) { if (e.flipped && !shown) { shown = true; a.setLabel(e.flip); pad.visible = false; } },
-      bubble(e) { if (e.flipped) return B('Đích thật ở chỗ khác nha 😜', e.x, 190, e.z, 14); }
+      bubble(e) { if (e.flipped) return B('Đích thật ở chỗ khác nhé 😜', e.x, 190, e.z, 14); }
     };
   },
 
@@ -334,8 +336,8 @@ const V = {
       },
       bubble(e) {
         if (e.hit) return B('MẤT DẠY!', e.x, 110, e.z, 16);
-        if (e.st === 1 && e.pauseT > 0 && Math.abs(e.t - Math.hypot(e.x1 - e.sx, e.z1 - e.sz) / 2) < 1) return B('Ủa quên mua hành...', e.x, 110, e.z, 14);
-        if (e.st === 1) return B('Từ từ con ơi...', e.x, 110, e.z, 14);
+        if (e.st === 1 && e.pauseT > 0 && Math.abs(e.t - Math.hypot(e.x1 - e.sx, e.z1 - e.sz) / 2) < 1) return B('Ơ quên mua hành...', e.x, 110, e.z, 14);
+        if (e.st === 1) return B('Từ từ cháu ơi...', e.x, 110, e.z, 14);
       }
     };
   },
@@ -476,7 +478,7 @@ const V = {
       },
       bubble(e, w, t) {
         if (w.status === 'dead' && w.cause?.startsWith('thrower')) return B(e.kind === 'water' ? 'Tưới cây thôi mà!' : 'Trúng rồi! Hí hí', e.x, H + 120, e.z, 15);
-        if (e.on) return B(e.kind === 'water' ? 'Tạt nước nè!' : 'Chạy xe ồn quá!', e.x, H + 120, e.z, 14);
+        if (e.on) return B(e.kind === 'water' ? 'Tạt nước này!' : 'Chạy xe ồn quá!', e.x, H + 120, e.z, 14);
       }
     };
   },
@@ -522,7 +524,7 @@ const V = {
       },
       bubble(e, w) {
         if (e.kind === 'branch') { if (e.wind) return { s: 'xào xạc...', x: e.x, y: 130, z: e.z, size: 14, plain: true }; if (w.cause === 'branch' && w.status === 'dead') return B('BỐP!', e.x, 140, e.z, 16); return; }
-        if (e.st > 0 && e.a < 1) return B('Ủa có người hả?', e.x, 110, e.z, 14);
+        if (e.st > 0 && e.a < 1) return B('Ơ có người à?', e.x, 110, e.z, 14);
       }
     };
   },
@@ -548,7 +550,7 @@ const V = {
       bubble(e) {
         if (e.st === 1) return B('Chúc mừng! 🎉', e.x, 190, e.z, 15);
         if (e.st === 2) return B('...mà khoan', e.x, 190, e.z, 15);
-        if (e.st === 3) return B('Qua màn gì mà dễ vậy 😜', e.x, 190, e.z, 14);
+        if (e.st === 3) return B('Qua màn gì mà dễ thế 😜', e.x, 190, e.z, 14);
       }
     };
   },
@@ -560,7 +562,7 @@ const V = {
       const color = e.color ?? (e.car ? '#e63946' : '#c7ccd3');
       const c = MD.makeCar(len, e.top, color, { truck: !e.car, taxi: color === '#2fa84f' || color === '#f4f4f4' });
       c.g.position.x = -len / 2; c.g.scale.z = wid / 96;
-      // parked with a slight random angle, like real Saigon parking
+      // parked with a slight random angle, like real Hanoi parking
       c.g.rotation.y = (hash(e.x + e.z * 3) - 0.5) * 0.06;
       g.add(c.g);
     } else {
@@ -587,6 +589,12 @@ V.cpgate = (e) => {
     update(e) { boom.rotation.z = e.a * 1.45; },
     bubble(e) { return !e.open ? B('Qua hết đoạn này mới mở 🔒', cx, 150, cz, 13) : null; }
   };
+};
+V.deco = (e) => {
+  const g = e.kind === 'thaprua' ? MD.makeThapRua() : e.kind === 'street' ? MD.makeStreetSign(e.label ?? '') : new THREE.Group();
+  g.position.set(e.x, e.y ?? 0, e.z);
+  if (e.kind === 'street') return { obj: g, update(e, w, t, dt, ctx) { if (ctx?.cam) g.userData.plate.rotation.y = Math.atan2(ctx.cam.position.x - e.x, ctx.cam.position.z - e.z); } };
+  return { obj: g };
 };
 V.cpflag = (e) => {
   const g = new THREE.Group(); g.position.set(e.x + 30, 0, e.z - 26);

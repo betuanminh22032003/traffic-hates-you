@@ -293,8 +293,8 @@ function ending() {
   const full = !!S.run.full; // (finish count and record were already saved by onClear)
   S.run.level = STAGES.length; S.run.cp = 0;
   save();
-  $('end-time').textContent = tr(`Tới công ty lúc ${fmt(m)}!`);
-  $('end-late').textContent = tr(late > 0 ? `(trễ ${late} phút... bị trừ lương)` : 'Đúng giờ! Siêu nhân thật sự!');
+  $('end-time').textContent = tr(`Đến công ty lúc ${fmt(m)}!`);
+  $('end-late').textContent = tr(late > 0 ? `(muộn ${late} phút... bị trừ lương)` : 'Đúng giờ! Siêu nhân thật sự!');
   $('end-stats').innerHTML = `${tr('💀 Số lần chết:')} <b>${S.run.deaths}</b>` + (S.bestRun != null ? `${tr(' · Kỷ lục:')} <b>${S.bestRun}</b>` : '') +
     (full ? '' : `<br><small>${tr('(Lượt này có chọn chương hoặc gọi xe ôm nên không tính kỷ lục)')}</small>`) +
     `<br>${tr(`Tổng cộng đã chết ${S.totalDeaths} lần trên đường đi làm.`)}`;
@@ -303,7 +303,7 @@ function ending() {
 }
 
 async function share() {
-  const text = tr(`Mình vừa tới công ty lúc ${fmt(clockMin())} sau ${S.run.deaths} lần "toang" trong Traffic Hates You 🛵💀. Thử làm ít hơn xem!`);
+  const text = tr(`Mình vừa đến công ty lúc ${fmt(clockMin())} sau ${S.run.deaths} lần "toang" trong Traffic Hates You 🛵💀. Thử làm ít hơn xem!`);
   try {
     if (navigator.share) { await navigator.share({ title: 'Traffic Hates You', text, url: location.href }); return; }
     await navigator.clipboard.writeText(text + ' ' + location.href); toast('Đã chép, dán cho bạn bè nhé!');
@@ -455,7 +455,7 @@ function tick(inp) {
 // The level-clear card, for a finish that isn't one.
 function showFakeClear() {
   $('clear-head').textContent = tr('QUA MÀN!');
-  $('clear-msg').textContent = tr(levelDeaths ? `Đoạn này chết ${levelDeaths} lần` : 'Không chết lần nào?! Giỏi quá ta...');
+  $('clear-msg').textContent = tr(levelDeaths ? `Đoạn này chết ${levelDeaths} lần` : 'Không chết lần nào?! Giỏi thế...');
   $('c-clear').classList.remove('hidden');
   fakeAt = world.t;
 }

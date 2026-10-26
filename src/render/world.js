@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { part, box, cyl, ico, M, std, canvasTex, fontPx, settings, disposeTree } from './toon.js';
 import { makeTree, makeParkedBike } from './models.js';
-import { T, isSolidTile } from '../game/logic.js';
+import { T, isSolidTile, isVoidTile } from '../game/logic.js';
 
 export const THEMES = {
   dawn: {
@@ -30,7 +30,7 @@ export const THEMES = {
   }
 };
 
-const SIGNS = ['PHỞ', 'CƠM TẤM', 'TẠP HÓA', 'KARAOKE', 'SỬA XE', 'TRÀ ĐÁ', 'BÁNH MÌ', 'CẮT TÓC', 'CÀ PHÊ', 'BÚN BÒ', 'HỦ TIẾU', 'THUỐC', 'GỘI ĐẦU', 'ĐIỆN THOẠI', 'NHÀ THUỐC', 'TIỆM VÀNG'];
+const SIGNS = ['PHỞ', 'BÚN CHẢ', 'TẠP HÓA', 'KARAOKE', 'SỬA XE', 'TRÀ ĐÁ', 'BÁNH MÌ', 'CẮT TÓC', 'CÀ PHÊ', 'BÚN ĐẬU', 'BIA HƠI', 'THUỐC', 'GỘI ĐẦU', 'ĐIỆN THOẠI', 'PHOTOCOPY', 'VÀNG BẠC'];
 const SIGN_BG = ['#e63946', '#1d6fd8', '#f4a300', '#2a9d8f', '#8e44ad', '#c0392b'];
 
 function hash(n) { n = Math.round(n) | 0; n = Math.imul(n ^ (n >>> 16), 0x45d9f3b); n = Math.imul(n ^ (n >>> 16), 0x45d9f3b); n ^= n >>> 16; return (n >>> 0) / 4294967296; }
@@ -182,12 +182,14 @@ function bake(root) {
 }
 
 /* ---------- builders ---------- */
-let _shopMat, _shutMat, _atlasMat, _pitMat, _waterMat, _canalMat;
+let _shopMat, _shutMat, _atlasMat, _pitMat, _waterMat, _canalMat, _lakeMat, _riverMat;
 const pitMat = () => (_pitMat ??= new THREE.MeshBasicMaterial({ color: '#140e0a' }));
 const shopMat = () => (_shopMat ??= new THREE.MeshBasicMaterial({ map: textures().shop }));
 const shutterMat = () => (_shutMat ??= std({ map: textures().shutter }));
 const atlasMat = () => (_atlasMat ??= new THREE.MeshBasicMaterial({ map: textures().atlas }));
 const waterMat = () => (_waterMat ??= new THREE.MeshStandardMaterial({ color: '#4a87ad', transparent: true, opacity: 0.82, roughness: 0.08, metalness: 0.15 }));
+const lakeMat = () => (_lakeMat ??= new THREE.MeshStandardMaterial({ color: '#3f9a8c', transparent: true, opacity: 0.86, roughness: 0.06, metalness: 0.2 }));
+const riverMat = () => (_riverMat ??= new THREE.MeshStandardMaterial({ color: '#3c4a3a', transparent: true, opacity: 0.9, roughness: 0.2, metalness: 0.1 }));
 const canalMat = () => (_canalMat ??= new THREE.MeshStandardMaterial({ color: '#6b5a3a', roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.88 }));
 
 // Tile at (c, r); outside the map a street that touches the border keeps going, everything else is houses.
@@ -198,10 +200,10 @@ const cell = (m, c, r) => {
   return e === '=' || e === '~' ? e : '#';
 };
 const inside = (m, c, r) => r >= 0 && r < m.H && c >= 0 && c < m.W;
-const isFloor = ch => !isSolidTile(ch) && ch !== ' ';
+const isFloor = ch => !isSolidTile(ch) && !isVoidTile(ch);
 
 function buildGround(root, m, th, holes, treeTiles) {
-  const grass = th.rain ? '#4f6a3e' : '#6f9a4a';
+  const grass = th.rain ? '#4f6a3e' : '#6f9a4a', dist = floorDist(m);
   const holeAt = (c, r) => holes.some(h => c * T + T / 2 > h.x && c * T + T / 2 < h.x + h.w && r * T + T / 2 > h.z && r * T + T / 2 < h.z + h.d);
   for (let r = -4; r < m.H + 4; r++) for (let c = -4; c < m.W + 4; c++) {
     const ch = cell(m, c, r), x = c * T + T / 2, z = r * T + T / 2;
@@ -213,6 +215,12 @@ function buildGround(root, m, th, holes, treeTiles) {
         const vert = r < 0 || r >= m.H;
         for (let k = -1; k <= 1; k++) root.add(part(box(vert ? 22 : 10, 30, vert ? 10 : 22), k ? '#ff7b25' : '#f5f5f5', { pos: [x + (vert ? k * 24 : (c < 0 ? 30 : -30)), 15, z + (vert ? (r < 0 ? 30 : -30) : k * 24)] }));
       }
+    }
+    if (ch === 'H' || ch === 'R') {
+      // the lake (Hồ Gươm): green water with a stone bank; the river (Tô Lịch): black water between concrete banks
+      root.add(part(box(T, 10, T), ch === 'H' ? '#2f5c5a' : '#2a2f2a', { pos: [x, -60, z], outline: false, shadow: false }));
+      root.add(new THREE.Mesh(box(T, 6, T), ch === 'H' ? lakeMat() : riverMat()).translateX(x).translateY(ch === 'H' ? -14 : -34).translateZ(z));
+      continue;
     }
     if (ch === ' ' || holeAt(c, r)) {
       // pit: dark hole with dirt walls; in the rain levels it is a canal full of brown water
@@ -227,7 +235,7 @@ function buildGround(root, m, th, holes, treeTiles) {
       for (let k = -1; k <= 1; k++) root.add(part(box(vert ? 22 : 10, 30, vert ? 10 : 22), k ? '#ff7b25' : '#f5f5f5', { pos: [x + (vert ? k * 24 : 0), 15, z + (vert ? 0 : k * 24)] }));
       continue;
     }
-    if (isSolidTile(ch) && ch !== 'T') { if (inside(m, c, r)) root.add(part(box(T, 220, T), '#3e2c1f', { pos: [x, -110, z], outline: false, shadow: false })); continue; }
+    if (isSolidTile(ch) && ch !== 'T') { if (inside(m, c, r) && dist(c, r) <= 2) root.add(part(box(T, 220, T), '#3e2c1f', { pos: [x, -110, z], outline: false, shadow: false })); continue; }
     const kind = ch === '=' ? 'road' : ch === ',' || ch === 'T' ? 'grass' : 'walk';
     if (kind === 'grass') root.add(part(box(T, 40, T), grass, { pos: [x, -20, z], outline: false, receive: true, shadow: false }));
     else root.add(part(groundBox(x, z, kind === 'road' ? 256 : 96), groundMat(kind, th), { pos: [x, -20, z], outline: false, receive: true, shadow: false }));
@@ -250,12 +258,30 @@ function buildGround(root, m, th, holes, treeTiles) {
   }
 }
 
+// How many tiles a cell is from the nearest open ground. Houses deeper than a screen's worth are never
+// seen (the camera only ever looks at the player, who is on open ground), so they are not built at all.
+function floorDist(m) {
+  const C0 = -4, W = m.W + 8, R0 = -4, H = m.H + 8, d = new Int16Array(W * H).fill(999), q = [];
+  const K = (c, r) => (r - R0) * W + (c - C0);
+  for (let r = R0; r < R0 + H; r++) for (let c = C0; c < C0 + W; c++) if (!isSolidTile(cell(m, c, r))) { d[K(c, r)] = 0; q.push([c, r]); }
+  for (let i = 0; i < q.length; i++) {
+    const [c, r] = q[i], v = d[K(c, r)] + 1;
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const cc = c + dc, rr = r + dr;
+      if (cc < C0 || cc >= C0 + W || rr < R0 || rr >= R0 + H || d[K(cc, rr)] <= v) continue;
+      d[K(cc, rr)] = v; q.push([cc, rr]);
+    }
+  }
+  return (c, r) => (c < C0 || c >= C0 + W || r < R0 || r >= R0 + H ? 999 : d[K(c, r)]);
+}
+const SEEN = 7; // tiles from the street still worth building
+
 // Group the house tiles into buildings so the city reads as one continuous model instead of a grid of cubes:
 // tiles facing open ground become tube-house lots 1-3 tiles wide along the street, everything behind them
 // is merged into big block rectangles with one shared roofline.
 function planLots(m, seed) {
-  const C0 = -4, C1 = m.W + 4, R0 = -4, R1 = m.H + 4;
-  const isHouse = (c, r) => c >= C0 && c < C1 && r >= R0 && r < R1 && cell(m, c, r) === '#';
+  const C0 = -4, C1 = m.W + 4, R0 = -4, R1 = m.H + 4, dist = floorDist(m);
+  const isHouse = (c, r) => c >= C0 && c < C1 && r >= R0 && r < R1 && cell(m, c, r) === '#' && dist(c, r) <= SEEN;
   const open = (c, r) => !isSolidTile(cell(m, c, r));
   const faceH = (c, r) => open(c, r - 1) || open(c, r + 1);
   const faceV = (c, r) => open(c - 1, r) || open(c + 1, r);
@@ -341,7 +367,7 @@ function buildHouses(root, m, th, seed) {
     const sides = [[0, 1, 0], [0, -1, Math.PI], [1, 0, Math.PI / 2], [-1, 0, -Math.PI / 2]];
     for (let r = L.r; r < L.r + L.rh; r++) for (let c = L.c; c < L.c + L.cw; c++) for (const [dc, dr, rot] of sides) {
       const n = cell(m, c + dc, r + dr);
-      if (!isFloor(n) && n !== ' ') continue;
+      if (!isFloor(n) && !isVoidTile(n)) continue;
       const tx = c * T + T / 2, tz = r * T + T / 2, u = k => rnd(k + (c - L.c) * 5 + (r - L.r) * 7);
       const g = new THREE.Group(); g.position.set(tx + dc * (T / 2 + 0.6), 0, tz + dr * (T / 2 + 0.6)); g.rotation.y = rot;
       if (floors) { const fp = facePlane(T - 8, floors * 48, fm, 1, floors * 0.75); fp.position.set(0, 60 + floors * 24, 0); g.add(fp); }

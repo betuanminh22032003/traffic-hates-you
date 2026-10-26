@@ -1,16 +1,23 @@
-# Traffic Hates You – bản Sài Gòn 3D
+# Traffic Hates You – Hà Nội thật 3D
 
-Game troll-platformer 3D góc nhìn cao 3/4 cố định (học theo Trees Hate You): chạy xe máy tới công ty trước 8:00 qua 4 chương. Mỗi chương là **một bản đồ lớn liền mạch**: các khu phố Sài Gòn (hẻm, ngã tư, chợ, công viên, công trình...) nối với nhau bằng hẻm nhỏ, cuối mỗi khu có **cổng checkpoint**, chết thì quay lại checkpoint gần nhất. Bạn tự do chạy 8 hướng và nhảy. Thứ gì trên đường cũng ghét bạn: ổ gà tàng hình, đèn đỏ troll, cột điện đổ, chó không xích, bà cụ qua đường, xe buýt, ô tô mở cửa, đinh tặc, cục nóng máy lạnh rơi, cây đổ, triều cường, cổng công ty tự đóng... Chết là chuyện bình thường, mỗi lần chết đồng hồ chạy thêm 1 phút.
+Game troll-platformer 3D góc nhìn cao 3/4 cố định (học theo Trees Hate You): đi xe máy từ ngõ Khương Trung tới công ty ở Bờ Hồ trước 8:00 qua 4 chương. **Mọi khu phố đều là phố thật của Hà Nội** cắt từ bản đồ mở OpenStreetMap (ngõ ngách Khương Trung, Ngã Tư Sở, Đường Láng ven sông Tô Lịch, Tây Sơn, Ô Chợ Dừa, Khâm Thiên, Lê Duẩn có tàu chạy giữa phố, Nguyễn Khuyến, Phan Đình Phùng, Chợ Đồng Xuân, Hàng Đào, Hồ Gươm có Tháp Rùa), có biển tên phố thật. Mỗi chương là **một bản đồ lớn liền mạch**: các khu nối với nhau bằng ngõ, cuối mỗi khu có **cổng checkpoint**, chết thì quay lại checkpoint gần nhất. Bạn tự do chạy 8 hướng và nhảy. Thứ gì trên đường cũng ghét bạn: ổ gà tàng hình, đèn đỏ troll, cột điện đổ, chó không xích, bà cụ qua đường, xe buýt, ô tô mở cửa, đinh tặc, cục nóng điều hòa rơi, cây đổ, phố ngập thành sông, cổng công ty tự đóng... Chết là chuyện bình thường, mỗi lần chết đồng hồ chạy thêm 1 phút.
 
 ![Traffic Hates You](public/icons/og.png)
 
 ## Nội dung
 
-- **4 chương, mỗi chương một bản đồ lớn** gồm 3–4 khu (15 khu tất cả): Hẻm Nhỏ (bình minh) · Đường Lớn (ban ngày) · Mưa Sài Gòn (mưa, đường trơn) · Tới Công Ty (Quận 1).
-- **Checkpoint**: về đích một khu là cổng sang hẻm kế tiếp mở ra; chết thì hồi sinh ngay sau cổng gần nhất.
-- **Hẻm nối giữa các khu đầy bẫy ngẫu nhiên, không báo trước**: ổ gà tàng hình, cây đổ cực nhanh, cục nóng/chậu cây rơi, xe máy ninja lao từ sau lưng. Mỗi lần chết bẫy được xếp lại.
-- **20 loại bẫy**, mỗi màn có 3–6 bẫy, chơi kiểu "chết một lần là nhớ".
-- Đồ họa 3D kiểu hoạt hình (toon shading, viền đen), phố nhà ống, bảng hiệu, dây điện, mưa, nước ngập.
+- **4 chương, 15 khu phố thật** (tọa độ trong `scripts/build-hanoi.mjs`, bản đồ ô trong `src/game/hanoi-maps.js`):
+  - *Ngõ Nhỏ* (6:30, Thanh Xuân): Ngõ Khương Trung · Ngõ Vương Thừa Vũ · Đèn đỏ Nguyễn Trãi · Chợ Ngã Tư Sở.
+  - *Đường Lớn* (7:00): Ngã Tư Sở · Đường Láng (sông Tô Lịch tràn bờ) · Phố Tây Sơn · Ô Chợ Dừa.
+  - *Mưa Hà Nội* (7:20): Khâm Thiên · Lê Duẩn (tàu Thống Nhất chạy giữa phố) · Nguyễn Khuyến (phố thành sông) · Phan Đình Phùng (hàng sấu ghét bạn).
+  - *Tới Công Ty* (7:45, Hoàn Kiếm): Chợ Đồng Xuân · Hàng Đào · Bờ Hồ (dọc Đinh Tiên Hoàng, có Tháp Rùa; phóng xuống Hồ Gươm là chết).
+- Mỗi ô bản đồ là 8–12 m phố thật; đường lớn, ngõ, ngách, hồ, sông, công viên và tên phố đều lấy từ dữ liệu OpenStreetMap. Bẫy thì đặt tay trên từng khúc phố.
+- **Checkpoint**: về đích một khu là cổng sang ngõ kế tiếp mở ra; chết thì hồi sinh ngay sau cổng gần nhất.
+- **Ngõ nối giữa các khu đầy bẫy ngẫu nhiên, không báo trước**: ổ gà tàng hình, cây đổ cực nhanh, cục nóng/chậu cây rơi, xe máy ninja lao từ sau lưng. Mỗi lần chết bẫy được xếp lại.
+- **20 loại bẫy** (thêm tàu hỏa), mỗi khu có 5–12 bẫy, chơi kiểu "chết một lần là nhớ".
+- Đồ họa 3D kiểu hoạt hình (toon shading, viền đen), phố nhà ống, biển hiệu kiểu Hà Nội (bún chả, bia hơi, photocopy...), dây điện, mưa, nước ngập, Hồ Gươm.
+- Giọng Bắc: "ngõ" chứ không "hẻm", "rẽ" chứ không "quẹo", "điều hòa", "muộn làm", mẹ dặn mua xôi xéo, chậu quất rơi, xe buýt 32.
+- Thêm khu phố thật khác: `npm run osm` cắt một khung tọa độ bất kỳ thành bản đồ ô (xem mục "Bản đồ từ phố thật").
 - Nhạc nền ngũ cung và hiệu ứng âm thanh đều được tổng hợp bằng Web Audio, không cần file âm thanh.
 - Lưu tiến trình (màn đã mở, số lần chết ít nhất mỗi màn, kỷ lục cả lượt).
 - Chơi được bằng bàn phím, cảm ứng (điện thoại, máy tính bảng) và tay cầm.
@@ -34,7 +41,8 @@ Cần Node.js 20 trở lên.
 ```bash
 npm install
 npm run dev        # mở http://localhost:5173/game.html
-npm test           # bot tự chơi 15 khu + chạy qua mọi hẻm với 20 lần xếp bẫy ngẫu nhiên
+npm test           # bot tự chơi 15 khu phố thật + chạy qua mọi ngõ nối với 20 lần xếp bẫy ngẫu nhiên + thử công cụ nhập OpenStreetMap
+npm run hanoi      # sinh lại src/game/hanoi-maps.js từ dữ liệu OpenStreetMap (cần cache, xem mục "Bản đồ từ phố thật")
 npm run build      # build vào dist/ và chép bản build ra thư mục gốc repo
 npm run preview    # chạy thử bản build
 ```
@@ -67,12 +75,12 @@ Kết nối repo, build command `npm run build`, publish directory `dist`. Khôn
 
 ### Trước khi phát hành, kiểm tra
 
-- [ ] `npm test` báo `Every chapter map is sealed by its checkpoints and every alley is passable.` (và các khu đều `ok`).
+- [ ] `npm test` báo `Every chapter map is sealed by its checkpoints and every alley is passable.` và `OSM import works on the sample block.` (và các khu đều `ok`).
 - [ ] `npm run build` không lỗi, `npm run preview` chơi thử được chương 1; tắt mạng rồi tải lại trang vẫn chơi được.
 - [ ] Đổi link/ảnh chia sẻ nếu đăng ở chỗ khác GitHub Pages: thẻ `og:url`, `og:image` trong `game.html` phải là link tuyệt đối; ảnh ở `public/icons/og.png` (1200 × 630).
-- [ ] Đổi phiên bản trong `package.json` và chữ `v3.1` ở màn hình tiêu đề (`game.html`).
+- [ ] Đổi phiên bản trong `package.json` và chữ `v4.0` ở màn hình tiêu đề (`game.html`).
 - [ ] Không cần đổi tên cache: mỗi lần build, `sw.js` tự nhận mã phiên bản mới và danh sách file cần lưu offline.
-- [ ] Đổi cấu trúc màn/chương thì tăng khóa lưu trong `src/save.js` (`traffic-hates-you:v2` → `v3`) để save cũ không trỏ sai chỗ.
+- [ ] Đổi cấu trúc màn/chương thì tăng khóa lưu trong `src/save.js` (`traffic-hates-you:v3` → `v4`) để save cũ không trỏ sai chỗ.
 
 ## Thiết kế
 
@@ -84,23 +92,29 @@ Tài liệu thiết kế sản phẩm (vấn đề, nguyên tắc troll, cơ ch�
 game.html               khung trang + các màn hình menu (mã nguồn; index.html ở gốc là bản build)
 src/main.js             vòng lặp game, luồng màn chơi, menu, input (phím, cảm ứng, tay cầm)
 src/game/logic.js       mô phỏng gameplay thuần (không DOM, không three.js, tất định)
-src/game/levels.js      dữ liệu 15 khu + 4 chương
-src/game/stages.js      ghép các khu của một chương thành một bản đồ lớn: hẻm nối, cổng checkpoint, bẫy ngẫu nhiên
+src/game/levels.js      4 chương + bẫy của 15 khu, đặt trên bản đồ phố thật
+src/game/hanoi-maps.js  15 khu phố thật dạng bản đồ ô (sinh bởi scripts/build-hanoi.mjs, đừng sửa tay)
+src/game/stages.js      ghép các khu của một chương thành một bản đồ lớn: ngõ nối, cổng checkpoint, bẫy ngẫu nhiên
 src/game/messages.js    câu thoại khi chết
 src/render/view.js      scene three.js, camera cao 3/4, người chơi, hạt, bong bóng thoại
-src/render/world.js     dựng khu phố từ bản đồ ô: đường, vỉa hè, cỏ, kênh, hố, nhà ống, bảng hiệu, trời, mưa
-src/render/entities.js  hình 3D cho từng loại bẫy, cổng và cờ checkpoint
-src/render/models.js    mô hình (xe máy, chó, CSGT, bà cụ, xe buýt, ô tô, cây...)
+src/render/world.js     dựng khu phố từ bản đồ ô: đường, vỉa hè, cỏ, kênh, hố, hồ, nhà ống, biển hiệu, trời, mưa
+src/render/entities.js  hình 3D cho từng loại bẫy, cổng và cờ checkpoint, cảnh trang trí (Tháp Rùa)
+src/render/models.js    mô hình (xe máy, chó, CSGT, bà cụ, xe buýt, ô tô, cây, thùng xốp, Tháp Rùa...)
 src/render/toon.js      vật liệu toon, viền, chữ vẽ bằng canvas
 src/audio.js            hiệu ứng âm thanh + nhạc nền tổng hợp
 src/save.js             lưu tiến trình và cài đặt (localStorage)
 src/i18n.js             đổi ngôn ngữ: tr() tra câu tiếng Việt trong từ điển, số trong câu là ký tự đại diện {n}
 src/lang/en.js          từ điển tiếng Anh (khóa là câu tiếng Việt y như trong game)
 scripts/mechanics.mjs   kiểm tra cảm giác lái và các bẫy troll (npm test)
+scripts/autobot.mjs     bot chơi chung: tự tìm đường trên bản đồ và phản ứng với bẫy (nhảy ổ gà, đợi đèn đỏ, né tàu xe, lách dép...)
 scripts/smoke-test.mjs  bot tự chơi hết các khu, lần đầu và sau khi bẫy đổi (npm test)
-scripts/stage-test.mjs  bản đồ chương: không có đường tắt qua checkpoint, hẻm nào cũng qua được (npm test)
+scripts/viewzone.mjs    in một khu kèm đường đi của bot và vị trí bẫy, để đặt bẫy theo tọa độ ô
+scripts/stage-test.mjs  bản đồ chương: không có đường tắt qua checkpoint, ngõ nào cũng qua được (npm test)
+scripts/osm-import.mjs  lấy phố thật từ OpenStreetMap thành bản đồ ô (npm run osm)
+scripts/build-hanoi.mjs danh sách 15 khung tọa độ của game và lệnh sinh hanoi-maps.js (npm run hanoi)
+scripts/osm-test.mjs    thử công cụ nhập OpenStreetMap trên một khu mẫu (npm test)
 scripts/i18n-test.mjs   mọi câu tiếng Việt người chơi thấy đều có bản tiếng Anh (npm test)
-scripts/solutions.mjs   "đường đi" của bot cho từng màn
+scripts/solutions.mjs   lời giải kịch bản cho màn nào bot chung không chơi được (hiện trống)
 scripts/make-icons.mjs  vẽ lại icon app (cần Playwright)
 public/                 manifest PWA, service worker, icon
 legacy-2d.html          bản prototype 2D ban đầu (không nằm trong bản build)
@@ -108,28 +122,52 @@ legacy-2d.html          bản prototype 2D ban đầu (không nằm trong bản 
 
 Logic dùng tọa độ "pixel": mỗi ô bản đồ rộng `T = 80`; `x` sang phải màn hình, `z` hướng về phía camera (xuống dưới màn hình), `h` là độ cao. Phần vẽ 3D dùng thẳng X = x, Y = h, Z = z. Camera đặt cao phía trước, nhìn xuống khoảng 58° và chỉ trượt theo người chơi trong giới hạn bản đồ. Vì logic tất định nên bot trong `scripts/` có thể phát lại một lời giải và chứng minh màn đó qua được.
 
-## Thêm hoặc sửa màn
+## Thêm hoặc sửa khu
 
-1. Mở `src/game/levels.js`, thêm một phần tử vào `LEVELS`: `id`, `ch` (chương), `name`, `rain` nếu trời mưa, `map` (mảng chuỗi, mỗi ký tự một ô) và `build` trả về danh sách bẫy.
+1. Chọn khung tọa độ cho khu mới trong `scripts/build-hanoi.mjs` (`bbox` = nam, tây, bắc, đông; `cell` = số mét mỗi ô, 8 cho ngõ, 10–12 cho đường lớn; có thể thêm `fill` cho hồ/công viên, `along` cho sông chạy men theo một phố, `trees` cho hàng cây, `paint` để sơn nước ngập, `start`/`finish` để chọn chỗ xuất phát và đích). Chạy `npm run hanoi` để sinh lại `src/game/hanoi-maps.js`.
 2. Ký hiệu bản đồ:
 
    | Ký tự | Ô |
    |---|---|
    | `#` | nhà (tường, không đi qua được) |
    | `T` | cây · `K` sạp, ki-ốt (cũng là tường) |
-   | `=` | lòng đường · `.` vỉa hè · `,` cỏ |
-   | `~` | nước ngập (chạy chậm, ngâm lâu thì chết máy) |
+   | `=` | lòng đường · `.` vỉa hè, ngõ · `,` cỏ |
+   | `~` | nước ngập (chạy chậm, ngâm lâu thì chết máy; nhảy liên tục thì qua được) |
    | ` ` (dấu cách) | kênh / hố (rơi là chết) |
+   | `H` | hồ (Hồ Gươm) · `R` sông (Tô Lịch): rơi là chết, thẻ chết riêng |
    | `S` | chỗ xuất phát · `F` đích (ô sàn) |
 
-3. Chữ mới (lời nhắc, tên khu, nhãn đích...) cần thêm bản dịch vào `src/lang/en.js`; `npm test` sẽ liệt kê câu còn thiếu.
-4. Bẫy đặt theo tọa độ ô (cột, hàng), `0.5` là giữa ô. Hàm có sẵn: `hole` (ổ gà, `hidden` = tàng hình), `dog`, `mover` (car/bike/bus/cart/truck chạy thẳng theo hướng `R L U D`; `every` lặp lại, `aim` nhắm vào bạn, `stay` đỗ lại chắn đường, `roof` đứng lên nóc được), `pole`/`tree` (đổ theo góc `ang`), `fall` (máy lạnh, chậu kiểng, thép rơi đúng chỗ bạn đứng), `manhole`, `nails`, `light`, `speedcam`, `gate`, `walker` (bà cụ), `finish` (`run` = đích bỏ chạy), `sign` (đích giả), `plat` (thúng, giàn giáo; `mx/mz` di chuyển, `fall` sập), `banner`, `block`, `car` (ô tô đỗ, nhảy lên nóc được), `txt`, `oil` (vũng nhớt, mất lái), `bump` (gờ giảm tốc, `kmh`), `speedcam` (`kmh`, `min: true` = tốc độ tối thiểu), `thrower` (bà tầng 2 ném dép / tạt nước vào chỗ bạn sắp tới), `door` (cửa ô tô bật ra), `branch` (cành cây đấm theo chu kỳ), `fakewin` (đích giả; đích thật là `finish(..., { after: true })`), `call` (cuộc gọi troll che màn hình: `boss`, `mom`, `ex`, `bank`, `ride`). Tham số `at: [c, r]` và `tr` đặt điểm kích hoạt và bán kính.
+3. Thêm khu vào `LEVELS` trong `src/game/levels.js` bằng `zone(id, chương, khóa, 'NHÃN ĐÍCH', M => [ ...bẫy ])`. Biển tên phố và đích được thêm tự động. Xem khu kèm đường đi của bot để chọn chỗ đặt bẫy: `node scripts/viewzone.mjs <id>` (chữ `*` là đường bot đi, chữ cái là bẫy).
+4. Chữ mới (lời nhắc, tên khu, nhãn đích...) cần thêm bản dịch vào `src/lang/en.js`; `npm test` sẽ liệt kê câu còn thiếu. Tên phố trên biển cố ý giữ tiếng Việt.
+5. Bẫy đặt theo tọa độ ô (cột, hàng), `0.5` là giữa ô. Hàm có sẵn: `hole` (ổ gà, `hidden` = tàng hình), `dog`, `mover` (car/bike/bus/cart/truck/train chạy thẳng theo hướng `R L U D`; `every` lặp lại, `aim` nhắm vào bạn, `stay` đỗ lại chắn đường, `roof` đứng lên nóc được), `pole`/`tree` (đổ theo góc `ang`), `fall` (điều hòa, chậu cảnh, thép rơi đúng chỗ bạn đứng), `manhole`, `nails`, `light`, `speedcam`, `gate`, `walker` (bà cụ), `finish` (`run` = đích bỏ chạy), `sign` (đích giả), `plat` (thùng xốp, giàn giáo; `mx/mz` di chuyển, `fall` sập), `banner`, `block`, `car` (ô tô đỗ, nhảy lên nóc được), `txt`, `oil` (vũng nhớt, mất lái), `bump` (gờ giảm tốc, `kmh`), `speedcam` (`kmh`, `min: true` = tốc độ tối thiểu), `thrower` (bà tầng 2 ném dép / tạt nước vào chỗ bạn sắp tới), `door` (cửa ô tô bật ra), `branch` (cành cây đấm theo chu kỳ), `fakewin` (đích giả; đích thật là `finish` với `after: true`), `call` (cuộc gọi troll che màn hình: `boss`, `mom`, `ex`, `bank`, `ride`), `deco` (cảnh trang trí: `thaprua`, `street`). Tham số `at: [c, r]` và `tr` đặt điểm kích hoạt và bán kính.
    Bẫy theo lượt: `first: true` chỉ có ở lần chơi đầu, `retry: true` chỉ có sau khi đã chết ít nhất một lần.
-5. Thêm lời giải cho bot vào `scripts/solutions.mjs` (một kịch bản, hoặc `{ 0: [...], 5: [...] }` nếu lần đầu và lần chơi lại khác nhau) rồi chạy `npm test`. Gỡ lỗi một màn: `node scripts/dbg.mjs <id>` in ra từng sự kiện.
+6. Chạy `npm test`: bot chung (`scripts/autobot.mjs`) phải qua được khu ở lần đầu và sau khi bẫy đổi. Bot biết nhảy ổ gà, đinh, nắp cống, vật rơi đã nằm đường; đợi đèn đỏ, bà cụ, cành cây, xe cắt ngang, tàu; chậm lại trước camera và gờ; lách dép; chạy khỏi chỗ vật sắp rơi; nhảy liên tục qua nước ngập. Bẫy nào bot không hiểu (ví dụ nhảy thúng) thì viết lời giải kịch bản vào `scripts/solutions.mjs`. Gỡ lỗi: `node scripts/dbg.mjs <id>` in ra từng sự kiện.
 
 Số liệu vật lý tham khảo: tốc độ tối đa 4.4 px/khung (≈ 75 km/h trên đồng hồ), nhảy cao ≈ 84 px, nhảy xa ≈ 150 px (gần 2 ô) khi chạy hết tốc, nên hố rộng 1 ô nhảy qua được, hố 2 ô thì không; dây điện ở độ cao 250 px (bị nắp cống bắn lên là giật điện).
+
+## Bản đồ từ phố thật (OpenStreetMap)
+
+Toàn bộ 15 khu là phố thật, lấy từ OpenStreetMap, cùng dữ liệu mà các app bản đồ dùng. Hai cách lấy dữ liệu:
+
+- **Cache Overpass sẵn có cho cả Hà Nội** (dùng khi làm bản này): file `overpass_cache.zip` (34 MB, giải nén 226 MB) ở bản phát hành `data-v1` của repo [tuandat07032007-rgb/hanoi-graph](https://github.com/tuandat07032007-rgb/hanoi-graph/releases/tag/data-v1). Giải nén rồi chạy:
+
+  ```bash
+  OSM_CACHE=/đường/dẫn/tới/cache npm run hanoi      # sinh lại src/game/hanoi-maps.js cho 15 khu
+  ```
+
+- **Tải trực tiếp từ Overpass** (cần mạng): `OSM_LIVE=1 npm run hanoi`, hoặc cắt một khung bất kỳ:
+
+  ```bash
+  # tọa độ: nam,tây,bắc,đông · --cell là số mét mỗi ô (8 m là vừa, nhỏ hơn thì map to hơn)
+  npm run osm -- --bbox 21.0325,105.8485,21.0355,105.8525 --cell 8 --name "Hàng Đào" --out hang-dao.txt
+  ```
+
+Công cụ vẽ đường, ngõ, nhà, công viên, hồ, cây trong khung tọa độ thành bản đồ ô theo đúng ký hiệu ở trên (`=` đường lớn, `.` ngõ và vỉa hè, `#` nhà, `,` công viên, `H` hồ, `T` cây), đặt `S` và `F` trong phần phố liên thông lớn nhất (hoặc theo `--start`/`--finish`), in kèm tên phố để làm biển, và báo nếu hai điểm không nối nhau. Cầu và đường trên cao được bỏ qua (nếu không nó sẽ đè lên phố bên dưới), bật lại bằng `--bridges`. Những thứ dữ liệu không có thì thêm tay: `--along "Đường Láng",-34,30,R` vẽ sông Tô Lịch men theo Đường Láng, `--fill lat,lon,H` đổ nước vào lòng hồ bọc bởi các phố quanh nó, `--trees "Phố Phan Đình Phùng",20` trồng hàng cây, `--paint c0,r0,c1,r1,~` sơn nước ngập (chỉ lên mặt đường).
+
+Mẹo chọn khung: mỗi khu 20–50 ô ngang là vừa, tức một khúc phố 200–400 m; khu phố cổ ngõ hẹp nên để `--cell 8`, ngã tư lớn `--cell 10–12`. Bản đồ sinh ra đã được commit (`src/game/hanoi-maps.js`) nên chơi game không cần dữ liệu; chỉ cần dữ liệu khi muốn cắt lại khu. Dữ liệu © OpenStreetMap contributors, giấy phép ODbL; game ghi nguồn trong phần Giới thiệu.
 
 ## Giấy phép tài nguyên
 
 - Three.js: MIT. Font Baloo 2: SIL Open Font License (qua gói `@fontsource/baloo-2`).
 - Toàn bộ mô hình, hình vẽ, âm thanh, nhạc trong game được tạo bằng mã trong repo này.
+- Bản đồ 15 khu (`src/game/hanoi-maps.js`) lấy từ OpenStreetMap: © OpenStreetMap contributors, giấy phép ODbL (đã ghi nguồn trong phần Giới thiệu của game).

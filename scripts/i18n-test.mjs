@@ -13,7 +13,7 @@ const add = (s, where) => { if (typeof s === 'string' && VI.test(s) && !need.has
 for (const c of CHAPTERS) { add(c.name, 'chapter'); add(c.sub, 'chapter'); }
 for (const L of LEVELS) {
   add(L.name, `level ${L.id}`);
-  for (const e of L.build()) for (const k of ['s', 'label', 'flip']) add(e[k], `level ${L.id} ${e.k}`);
+  for (const e of L.build()) { if (e.k === 'deco') continue; /* street-name signs stay Vietnamese */ for (const k of ['s', 'label', 'flip']) add(e[k], `level ${L.id} ${e.k}`); }
 }
 for (const v of Object.values(DEATH)) for (const s of [].concat(v)) add(s, 'death');
 for (const [, s] of TAUNT) add(s, 'taunt');
