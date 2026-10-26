@@ -307,10 +307,32 @@ export function makeBarrier(w = 50, h = 50, d = 220) {
   return g;
 }
 
+// Styrofoam box: what people really float on when a Hanoi street turns into a river.
 export function makeBoat(w = 120) {
   const g = new THREE.Group();
-  g.add(part(cyl(w / 2, w / 2 - 8, 20, 20).scale(1, 1, 0.8), '#9b7a4a', { pos: [w / 2, 10, 0] }));
-  const rim = part(new THREE.TorusGeometry(w / 2 - 2, 3, 6, 24), '#6e5530', { pos: [w / 2, 20, 0], rot: [Math.PI / 2, 0, 0], outline: false }); rim.scale.y = 0.8; g.add(rim);
+  const d = w * 0.8;
+  g.add(part(box(w - 6, 22, d - 6), '#f1f1ec', { pos: [w / 2, 11, 0] }));
+  g.add(part(box(w, 6, d), '#e9e9e2', { pos: [w / 2, 24, 0] }));
+  g.add(part(box(w - 20, 2, 10), '#2f6fb5', { pos: [w / 2, 28, 0], outline: false }));
+  return g;
+}
+
+// Tháp Rùa: the little tower on its island in the middle of Hồ Gươm.
+export function makeThapRua() {
+  const g = new THREE.Group();
+  const island = part(cyl(78, 86, 14, 18), '#6f9a4a', { pos: [0, -7, 0] }); g.add(island);
+  g.add(part(cyl(84, 90, 6, 18), '#8a8378', { pos: [0, -16, 0], outline: false }));
+  const WALL = '#e4ddc8', ROOF = '#5a4636';
+  const tier = (w, h, y, d = w * 0.8) => {
+    g.add(part(box(w, h, d), WALL, { pos: [0, y + h / 2, 0] }));
+    // arched openings as dark slots
+    for (const s of [-1, 1]) g.add(part(box(w * 0.18, h * 0.55, 2), '#2a2420', { pos: [s * w * 0.22, y + h * 0.42, d / 2 + 1], outline: false }));
+    g.add(part(box(w + 10, 5, d + 10), ROOF, { pos: [0, y + h + 2.5, 0], outline: false }));
+  };
+  tier(64, 36, 0); tier(50, 30, 41); tier(36, 26, 76);
+  g.add(part(cyl(0, 22, 22, 4), ROOF, { pos: [0, 118, 0], rot: [0, Math.PI / 4, 0] }));
+  g.add(part(sph(4, 8), '#d9b24c', { pos: [0, 131, 0], outline: false }));
+  g.add(part(box(4, 60, 4), '#b8ad94', { pos: [0, 0, 0], outline: false }));
   return g;
 }
 export function makePlank(w = 120, kind = 'board', d = 110) {

@@ -1,6 +1,6 @@
-// Level data, Trees-Hate-You style: each level is a small Saigon block you roam freely.
+// Level data, Trees-Hate-You style: each level is a small Hanoi block you roam freely.
 // Map legend: '#' house  'T' tree  'K' kiosk/wall  '=' road  '.' pavement  ',' grass
-//             '~' flood water  ' ' canal / pit  'S' start  'F' finish
+//             '~' flood water  ' ' canal / pit  'H' lake (Hồ Gươm)  'S' start  'F' finish
 // Entities use tile coordinates (column, row); helpers convert them to world px.
 import { T } from './logic.js';
 
@@ -41,17 +41,18 @@ const door = (c, r, dir, o = {}) => ({ k: 'door', x: c * T, z: r * T, dx: DIRS[d
 const branch = (c, r, dir, o = {}) => ({ k: 'door', kind: 'branch', x: c * T, z: r * T, dx: DIRS[dir][0], dz: DIRS[dir][1], ...opts(o) });
 const fakewin = (c, r, label, o = {}) => ({ k: 'fakewin', x: P(c), z: P(r), label, ...opts(o) });
 const call = (c, r, who, o = {}) => ({ k: 'call', x: P(c), z: P(r), who, ...opts(o) });
+const deco = (c, r, kind, o = {}) => ({ k: 'deco', kind, x: P(c), z: P(r), ...o });
 
 export const CHAPTERS = [
-  { name: 'Hẻm Nhỏ', sub: '6:30 sáng · Bình Thạnh', theme: 'dawn' },
-  { name: 'Đường Lớn', sub: '7:00 sáng · Điện Biên Phủ', theme: 'day' },
-  { name: 'Mưa Sài Gòn', sub: '7:20 sáng · trời đổ mưa', theme: 'rain' },
-  { name: 'Tới Công Ty', sub: '7:45 sáng · Quận 1', theme: 'office' }
+  { name: 'Ngõ Nhỏ', sub: '6:30 sáng · Thanh Xuân', theme: 'dawn' },
+  { name: 'Đường Lớn', sub: '7:00 sáng · Ngã Tư Sở', theme: 'day' },
+  { name: 'Mưa Hà Nội', sub: '7:20 sáng · trời đổ mưa', theme: 'rain' },
+  { name: 'Tới Công Ty', sub: '7:45 sáng · Hoàn Kiếm', theme: 'office' }
 ];
 
 export const LEVELS = [
-  /* ---------- Chương 1: Hẻm Nhỏ ---------- */
-  { id: 1, ch: 0, name: 'Hẻm 42', map: [
+  /* ---------- Chương 1: Ngõ Nhỏ ---------- */
+  { id: 1, ch: 0, name: 'Ngõ 42', map: [
     '##############',
     '#S..........##',
     '#...........##',
@@ -68,7 +69,7 @@ export const LEVELS = [
     hole(7, 1, 1, 2, { hidden: true, at: [6.4, 1.5], tr: 34, retry: true }),
     txt(10.5, 1, 'Gờ giảm tốc! Giữ SHIFT 🐢', { h: 90, size: 15, color: '#ffd23f' }),
     bump(10, 1, 2, { kmh: 40 }),
-    txt(11, 4, 'Quẹo trái nè ↓', { h: 70, size: 16 }),
+    txt(11, 4, 'Rẽ trái đây ↓', { h: 70, size: 16 }),
     dog(6, 4.5, { tr: 160 }),
     // the finish is a lie; the real one pops up back where you came from
     fakewin(1, 4.5, 'CÔNG TY'),
@@ -84,7 +85,7 @@ export const LEVELS = [
     '###....#....F..#',
     '################'
   ], build: () => [
-    txt(2, 1, 'Hẻm này nhiều chó lắm...', { size: 18 }),
+    txt(2, 1, 'Ngõ này nhiều chó lắm...', { size: 18 }),
     dog(5, 2, { tr: 150 }),
     dog(11, 2, { tr: 140 }),
     manhole(7, 2.8), manhole(7, 3.5), manhole(7, 4.2),
@@ -94,7 +95,7 @@ export const LEVELS = [
     dog(14, 5, { tr: 210 }),
     finish(12, 6, 'CHỢ', { run: [14, 1] })
   ] },
-  { id: 3, ch: 0, name: 'Đèn Đỏ Đầu Hẻm', map: [
+  { id: 3, ch: 0, name: 'Đèn Đỏ Đầu Ngõ', map: [
     '######==#######',
     '######==#######',
     '#S....==......#',
@@ -126,7 +127,7 @@ export const LEVELS = [
     '#..............F#',
     '#################'
   ], build: () => [
-    txt(3, 1, 'Chợ đông. Nhường người đi bộ nha', { size: 16 }),
+    txt(3, 1, 'Chợ đông. Nhường người đi bộ nhé', { size: 16 }),
     walker(6, 0.2, 6, 3, { tr: 200, pause: 50, speed: 1.6 }),
     walker(9, 3, 9, 0.2, { tr: 200, speed: 2 }),
     mover('cart', 13, 0, 'D', { px: E(13), pz: P(-1), tr: 150, at: [11, 1.5], speed: 3.5, range: 210, stay: true }),
@@ -137,7 +138,7 @@ export const LEVELS = [
     thrower(12.5, 4, { at: [12.5, 5.8], tr: 200, every: 70, offset: 20 }),
     call(13, 5.5, 'mom', { tr: 70 }),
     hole(9, 5, 1, 2, { hidden: true, at: [10.5, 5.5], tr: 70 }),
-    finish(15, 6, 'CHỢ BÀ CHIỂU', { run: [1, 6] })
+    finish(15, 6, 'CHỢ NGÃ TƯ SỞ', { run: [1, 6] })
   ] },
 
   /* ---------- Chương 2: Đường Lớn ---------- */
@@ -166,7 +167,7 @@ export const LEVELS = [
     mover('bike', 0, 0, 'R', { px: P(-2), pz: P(5.5), aim: true, at: [5, 5.5], tr: 50, speed: 10, behind: true }),
     finish(1, 5.5, 'NGÃ TƯ')
   ] },
-  { id: 6, ch: 1, name: 'Ngã Tư Bảy Hiền', map: [
+  { id: 6, ch: 1, name: 'Ngã Tư Sở', map: [
     '#######==#######',
     '#######==#######',
     '#S.....==......#',
@@ -185,7 +186,7 @@ export const LEVELS = [
     txt(11, 6, 'Vừa bắt chạy chậm, giờ bắt chạy nhanh 🙃', { h: 110, size: 14 }),
     speedcam(10, 6, 3, 1, { kmh: 25, min: true }),
     light(7, 6, 2, 1, { tr: 230, fickle: true }),
-    finish(6, 6, 'XA LỘ', { run: [1, 6] })
+    finish(6, 6, 'ĐƯỜNG TRÊN CAO', { run: [1, 6] })
   ] },
   { id: 7, ch: 1, name: 'Trạm Xe Buýt', map: [
     '###################',
@@ -197,12 +198,12 @@ export const LEVELS = [
     '###################'
   ], build: () => [
     txt(2, 1, '🚏 Trạm xe buýt', { size: 18 }),
-    txt(9, 2.5, 'Triều cường 🌊 ngâm lâu là chết máy', { size: 15, color: '#bfe9ff' }),
+    txt(9, 2.5, 'Tô Lịch tràn bờ 🌊 ngâm lâu là chết máy', { size: 15, color: '#bfe9ff' }),
     mover('bus', 0, 0, 'R', { px: P(-4), pz: P(2.5), roof: true, top: 70, at: [2, 2], tr: 80, offset: 40, speed: 2.2, range: 1350, stay: true }),
     mover('bike', 0, 0, 'L', { px: P(20), pz: P(3), aim: true, at: [16, 3], tr: 60, speed: 7 }),
     fall(16, 5, 'ac', { at: [16.5, 4.5], tr: 70 }),
     call(6, 2.5, 'bank', { tr: 60, dur: 150 }),
-    finish(16, 5, 'CẦU THỊ NGHÈ')
+    finish(16, 5, 'Ô CHỢ DỪA')
   ] },
   { id: 8, ch: 1, name: 'Ô Tô Đỗ Bậy', map: [
     '##################',
@@ -226,7 +227,7 @@ export const LEVELS = [
     finish(1, 5, 'TRUNG TÂM')
   ] },
 
-  /* ---------- Chương 3: Mưa Sài Gòn ---------- */
+  /* ---------- Chương 3: Mưa Hà Nội ---------- */
   { id: 9, ch: 2, name: 'Mưa Rào', rain: true, map: [
     '################',
     '#S......  .....#',
@@ -247,13 +248,13 @@ export const LEVELS = [
     hole(2, 5, 1, 2, { hidden: true, puddle: true, at: [3.4, 5.5], tr: 40 }),
     finish(1, 5, 'CHỖ TRÚ MƯA')
   ] },
-  { id: 10, ch: 2, name: 'Triều Cường', rain: true, map: [
+  { id: 10, ch: 2, name: 'Phố Thành Sông', rain: true, map: [
     '#################',
     '#S.            .#',
     '#..            F#',
     '#################'
   ], build: () => [
-    txt(2, 1, 'Nước cuốn mất đường. Nhảy qua thúng!', { size: 15, color: '#bfe9ff' }),
+    txt(2, 1, 'Phố thành sông rồi. Nhảy qua thùng xốp!', { size: 15, color: '#bfe9ff' }),
     plat(3.1, 1, 1, 1, { mz: 30, per: 150 }),
     plat(4.7, 2, 1, 1, { mz: 30, per: 170, phase: 1 }),
     plat(6.3, 1, 1, 1, { mx: 20, per: 160 }),
@@ -293,7 +294,7 @@ export const LEVELS = [
     '#,,,,T,,,,,,,F#',
     '###############'
   ], build: () => [
-    txt(2, 2, 'Công viên Tao Đàn. Mát ghê.', { size: 17 }),
+    txt(2, 2, 'Công viên Thống Nhất. Mát thế.', { size: 17 }),
     tree(5, 1, Math.PI / 2, { at: [4.5, 2.5], tr: 100 }),
     tree(3, 3, 0, { at: [5, 3], tr: 90 }),
     // this one doesn't fall. It punches.
@@ -358,9 +359,13 @@ export const LEVELS = [
     '####==######==######',
     '#........##........#',
     '#..F.....==.....F..#',
+    '#HHHHHHHHHHHHHHHHHH#',
+    '#HHHHHHHHHHHHHHHHHH#',
     '####################'
   ], build: () => [
-    txt(3, 1, 'Màn cuối. Không còn gì bất ngờ nữa đâu.', { size: 15 }),
+    txt(3, 1, 'Màn cuối, Bờ Hồ rồi. Không còn gì bất ngờ nữa đâu.', { size: 15 }),
+    txt(3.5, 6.4, 'Hồ Gươm 🐢 đừng phóng xuống', { h: 36, size: 14, color: '#bfe9ff' }),
+    deco(10, 7, 'thaprua', { y: -6 }),
     call(2.5, 1.5, 'boss', { tr: 50, dur: 140 }),
     bump(7, 4, 2, { kmh: 35 }),
     thrower(16, 3, { at: [16, 1.5], tr: 190, kind: 'water', every: 80, offset: 10 }),

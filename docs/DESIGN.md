@@ -16,7 +16,7 @@ Rage game kiểu "Unfair Mario": cây cối đấm, bắn đại bác, thả đ�
 - Bạn tìm ra lời giải thì nó đổi đề.
 - Thứ trông an toàn nhất lại là bẫy.
 
-Bản v2 áp dụng ba nguyên tắc này vào bối cảnh giao thông Sài Gòn, kèm một ràng buộc: **mỗi cái chết phải học được**. Bẫy đều tất định, có tín hiệu báo trước (tiếng kẽo kẹt, vòng đỏ dưới đất, chữ "xào xạc...", biển báo) và màn nào cũng có bot chứng minh qua được.
+Bản v2 áp dụng ba nguyên tắc này vào bối cảnh giao thông Việt Nam (Sài Gòn ở v2–v3.1, Hà Nội từ v3.2), kèm một ràng buộc: **mỗi cái chết phải học được**. Bẫy đều tất định, có tín hiệu báo trước (tiếng kẽo kẹt, vòng đỏ dưới đất, chữ "xào xạc...", biển báo) và màn nào cũng có bot chứng minh qua được.
 
 ## 3. Điều khiển và cảm giác lái (sửa #1, #2)
 
@@ -81,3 +81,11 @@ Phản hồi: "map phải nối tiếp nhau, map lớn, có checkpoint như game
 - **Xe cộ không còn cảnh báo**: bỏ mũi tên "BÍÍP!" ở mép màn hình, bỏ tiếng còi khi xe xuất hiện và bong bóng "TRÁNH RA!".
 - **Cây/cột điện đổ nhanh gấp đôi**, gần như không rung lắc báo trước.
 - Cách qua (bot trong `scripts/stage-test.mjs` chứng minh với 20 lần xếp bẫy cho mỗi hẻm): trời khô chạy nhanh để vượt ổ gà; ổ gà mở sát quá thì phanh, nhích tới mép rồi nhảy; cây đổ phía trước thì phanh, đổ xong nhảy qua thân cây; có gì rơi xuống thì đạp ga; xe ninja thì dừng lại và nhảy khi nó cách ~90 px. Trời mưa phanh yếu nên phải chạy chậm.
+
+## 8. v3.2: dời về Hà Nội, phố thật từ bản đồ
+
+Phản hồi: "làm bối cảnh Hà Nội đi, thật như bản đồ thật thì ngọt luôn".
+
+- **Bối cảnh Hà Nội.** Đường đi làm: ngõ ở Thanh Xuân → Ngã Tư Sở, đường trên cao, sông Tô Lịch tràn bờ, Ô Chợ Dừa → mưa, phố thành sông (nhảy qua thùng xốp thay cho thúng), Công viên Thống Nhất → Hoàn Kiếm, văn phòng ngay Bờ Hồ. Khu cuối có **Hồ Gươm** (ô `H`, phóng xuống là chết với thẻ chết riêng: "Cụ Rùa lắc đầu") và **Tháp Rùa** giữa hồ (`deco`).
+- **Giọng Bắc.** Toàn bộ lời thoại đổi từ giọng Nam sang Bắc: hẻm → ngõ, quẹo → rẽ, nha/nè → nhé/này, hả/Ủa → à/Ơ, trễ → muộn, máy lạnh → điều hòa, tiệm → hàng, chậu mai → chậu quất, mẹ dặn mua xôi xéo, xe buýt 32. Biển hiệu phố: bún chả, bún đậu, bia hơi, photocopy, vàng bạc. Bản tiếng Anh đổi địa danh theo.
+- **Phố thật.** `scripts/osm-import.mjs` lấy đường, nhà, công viên, hồ, cây của một khung tọa độ từ OpenStreetMap và vẽ thành bản đồ ô đúng ký hiệu của game (xem README). Giữ nguyên cách làm màn: hình dáng phố lấy từ bản đồ, còn bẫy và lời giải cho bot vẫn đặt tay, vì mỗi cái chết phải học được và `npm test` vẫn phải chứng minh màn qua được. Các khu hiện tại vẫn là bản vẽ tay; dùng công cụ này để thay dần từng khu bằng khúc phố thật (gợi ý: Ngã Tư Sở cho khu 6, Hàng Đào–Hàng Ngang cho chương 4).

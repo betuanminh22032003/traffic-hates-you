@@ -6,7 +6,7 @@
 
 Game có ba đặc điểm quyết định chọn nền tảng:
 
-- **Tiếng Việt và tiếng Anh, bối cảnh Sài Gòn.** Người chơi hợp nhất là người Việt; từ bản v3.1 đã có tiếng Anh (tự chọn theo trình duyệt) để lên các cổng game nước ngoài.
+- **Tiếng Việt và tiếng Anh, bối cảnh Hà Nội** (từ v3.2; trước đó là Sài Gòn). Người chơi hợp nhất là người Việt; từ bản v3.1 đã có tiếng Anh (tự chọn theo trình duyệt) để lên các cổng game nước ngoài.
 - **Chạy trên web (HTML5), nhẹ (~2 MB), có offline, có điều khiển cảm ứng.** Đăng lên web gần như không tốn gì; lên app store thì phải đóng gói thêm.
 - **Thể loại rage game "chết là cười".** Loại này lan truyền nhờ clip ngắn (TikTok, Reels, YouTube Shorts) hơn là nhờ người ta lướt cửa hàng ứng dụng.
 
@@ -36,12 +36,12 @@ Game có ba đặc điểm quyết định chọn nền tảng:
 3. **Ảnh chia sẻ mới:** ảnh hiện tại là cảnh của bản cũ (nhìn từ sau lưng, đường thẳng). Nên dựng lại một ảnh chụp từ trên cao có cổng checkpoint, ổ gà và xe ninja để khớp lối chơi thật.
 4. **Quay 10–15 clip ngắn** trước ngày ra mắt rồi đăng đều mỗi ngày. Gợi ý nội dung:
    - "Tưởng qua màn rồi..." (đích giả + cục nóng rơi);
-   - "Bà cụ qua đường mạnh nhất Sài Gòn";
+   - "Bà cụ qua đường mạnh nhất Hà Nội";
    - "Xe ninja không còi";
    - "Chết 47 lần ở một ổ gà";
    - quay phản ứng của bạn bè lần đầu chơi.
    - Mỗi clip để link trong bio/bình luận. Thử thách gợi ý: "**Ai tới công ty trước 8:00?**" (đồng hồ trong game đã sẵn để khoe).
-5. **Đăng vào các nhóm Facebook** game indie Việt, nhóm meme giao thông, nhóm dân văn phòng Sài Gòn. Đăng kèm clip, đừng chỉ đăng link.
+5. **Đăng vào các nhóm Facebook** game indie Việt, nhóm meme giao thông, nhóm dân văn phòng Hà Nội. Đăng kèm clip, đừng chỉ đăng link.
 6. **Gửi cho vài kênh streamer/YouTuber Việt** hay chơi rage game hoặc game troll. Chỉ cần một video là đủ cú hích.
 
 ## 3. Giai đoạn 2 (tuần 2–4): itch.io
@@ -97,7 +97,7 @@ Các cổng như CrazyGames và Poki chủ yếu phục vụ người chơi nư�
 | Rủi ro | Mức | Việc nên làm |
 |---|---|---|
 | **Quy định game ở Việt Nam** (Nghị định 147/2024/NĐ-CP). Game này không có tương tác giữa người chơi với nhau hay với máy chủ, nên gần với loại **G4**. Theo các nguồn tổng hợp, phát hành game G2–G4 cần doanh nghiệp có Giấy chứng nhận và Giấy xác nhận thông báo phát hành. Mình **chưa tìm được** nguồn nói rõ cá nhân phát hành game miễn phí có phải làm thủ tục này không. | Cao nếu kiếm tiền tại Việt Nam | **Hỏi luật sư hoặc Cục Phát thanh, truyền hình và thông tin điện tử** trước khi gắn quảng cáo hoặc lên Google Play cho thị trường Việt Nam. Trong lúc chờ, để game miễn phí, không quảng cáo. |
-| **Tên game giống "Trees Hate You"** | Trung bình | Tên đang bám theo game gốc. Nếu game nổi, có thể bị phàn nàn. Cân nhắc tên riêng hơn, ví dụ "Kẹt Xe Hates You" hay "Saigon Hates You", trước khi lên cổng lớn hoặc Google Play. |
+| **Tên game giống "Trees Hate You"** | Trung bình | Tên đang bám theo game gốc. Nếu game nổi, có thể bị phàn nàn. Cân nhắc tên riêng hơn, ví dụ "Tắc Đường Hates You" hay "Hà Nội Hates You", trước khi lên cổng lớn hoặc Google Play. |
 | **Thương hiệu thật trong game** ("Grab") | Đã xử lý | Đổi thành "xe ôm công nghệ" ở v3.1. |
 | **Bạo lực hoạt hình** (chết vì xe, rơi đồ) | Thấp | Ghi rõ độ tuổi 12+ trên các nền tảng; phần Giới thiệu trong game đã có câu nhắc tuân thủ luật giao thông. |
 
@@ -109,7 +109,7 @@ Thứ tự gợi ý; không cần làm ngay:
 2. **Nhận ủng hộ:** itch.io "tuỳ tâm", kèm mã QR chuyển khoản/MoMo trên trang web (để ngoài game).
 3. **Quảng cáo qua SDK cổng game** (CrazyGames, Poki) cho bản tiếng Anh.
 4. **Quảng cáo trên web riêng** (AdSense cho game, hoặc mạng quảng cáo dành cho game HTML5). Chỉ làm khi đã rõ phần pháp lý ở mục 6.
-5. **Bản mở rộng:** chương mới (ví dụ "Tết về quê", "Kẹt xe cầu Sài Gòn"). Đây là lý do để người chơi cũ quay lại và để quay clip mới.
+5. **Bản mở rộng:** chương mới (ví dụ "Tết về quê", "Tắc đường Cầu Chương Dương", hoặc một khu phố thật lấy từ OpenStreetMap bằng `npm run osm`). Đây là lý do để người chơi cũ quay lại và để quay clip mới.
 
 ## 8. Lịch tóm tắt
 

@@ -21,7 +21,7 @@ const speedOf = p => Math.hypot(p.vx, p.vz);
 /* ---------- map ---------- */
 // '#' house, 'T' tree, 'K' kiosk/wall  -> solid
 // '=' road, '.' pavement, ',' grass, 'S' start, 'F' finish -> floor
-// '~' flood water (slow, the engine dies if you stay) ; ' ' canal / pit -> fall
+// '~' flood water (slow, the engine dies if you stay) ; ' ' canal / pit -> fall ; 'H' lake (Hồ Gươm) -> fall too
 const SOLID = new Set(['#', 'T', 'K', 'X']); // X: road barrier at the end of a street
 export function parseMap(rows) {
   const H = rows.length, W = Math.max(...rows.map(r => r.length));
@@ -39,7 +39,7 @@ export function tileAt(m, x, z) {
   return m.cells[r][c];
 }
 export const isSolidTile = ch => SOLID.has(ch);
-export const isVoidTile = ch => ch === ' ';
+export const isVoidTile = ch => ch === ' ' || ch === 'H';
 
 function die(w, cause, ev) {
   if (w.status !== 'play') return;
@@ -540,7 +540,7 @@ function updPlayer(w, inp, dt, ev) {
 
   p.water = p.onGround && !p.onPlat && p.h < 1 && tileAt(w.map, p.x, p.z) === '~';
   if (p.water) { p.wt += dt; if (p.wt > 80) die(w, 'flood', ev); } else p.wt = 0;
-  if (p.h < -170) die(w, 'fall', ev);
+  if (p.h < -170) die(w, tileAt(w.map, p.x, p.z) === 'H' ? 'lake' : 'fall', ev);
   if (p.h + PH > WIRE_H) die(w, p.launched ? 'bump' : 'zap', ev);
   if (p.onGround) p.launched = false;
   const sp2 = speedOf(p);

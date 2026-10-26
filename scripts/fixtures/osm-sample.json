@@ -1,0 +1,24 @@
+{
+  "note": "SYNTHETIC test fixture in the shape of an Overpass 'out geom' answer. Not real map data: a 240 x 160 m block with a crossroads, three buildings, a park with two trees and a pond.",
+  "bbox": [21.0300, 105.8500, 21.03144, 105.85231],
+  "elements": [
+    { "type": "way", "id": 1, "tags": { "highway": "primary", "name": "Phố Mẫu" },
+      "geometry": [ { "lat": 21.03072, "lon": 105.8500 }, { "lat": 21.03072, "lon": 105.85231 } ] },
+    { "type": "way", "id": 2, "tags": { "highway": "residential", "name": "Ngõ Mẫu" },
+      "geometry": [ { "lat": 21.0300, "lon": 105.85115 }, { "lat": 21.03144, "lon": 105.85115 } ] },
+    { "type": "way", "id": 3, "tags": { "highway": "footway" },
+      "geometry": [ { "lat": 21.03020, "lon": 105.85020 }, { "lat": 21.03020, "lon": 105.85100 } ] },
+    { "type": "way", "id": 10, "tags": { "building": "yes" },
+      "geometry": [ { "lat": 21.03090, "lon": 105.85010 }, { "lat": 21.03130, "lon": 105.85010 }, { "lat": 21.03130, "lon": 105.85090 }, { "lat": 21.03090, "lon": 105.85090 }, { "lat": 21.03090, "lon": 105.85010 } ] },
+    { "type": "way", "id": 11, "tags": { "building": "yes" },
+      "geometry": [ { "lat": 21.03090, "lon": 105.85140 }, { "lat": 21.03130, "lon": 105.85140 }, { "lat": 21.03130, "lon": 105.85220 }, { "lat": 21.03090, "lon": 105.85220 }, { "lat": 21.03090, "lon": 105.85140 } ] },
+    { "type": "way", "id": 12, "tags": { "building": "yes" },
+      "geometry": [ { "lat": 21.03005, "lon": 105.85140 }, { "lat": 21.03055, "lon": 105.85140 }, { "lat": 21.03055, "lon": 105.85180 }, { "lat": 21.03005, "lon": 105.85180 }, { "lat": 21.03005, "lon": 105.85140 } ] },
+    { "type": "way", "id": 20, "tags": { "leisure": "park", "name": "Vườn Mẫu" },
+      "geometry": [ { "lat": 21.03005, "lon": 105.85005 }, { "lat": 21.03060, "lon": 105.85005 }, { "lat": 21.03060, "lon": 105.85100 }, { "lat": 21.03005, "lon": 105.85100 }, { "lat": 21.03005, "lon": 105.85005 } ] },
+    { "type": "way", "id": 21, "tags": { "natural": "water", "water": "pond" },
+      "geometry": [ { "lat": 21.03030, "lon": 105.85030 }, { "lat": 21.03055, "lon": 105.85030 }, { "lat": 21.03055, "lon": 105.85070 }, { "lat": 21.03030, "lon": 105.85070 }, { "lat": 21.03030, "lon": 105.85030 } ] },
+    { "type": "node", "id": 30, "lat": 21.03012, "lon": 105.85015, "tags": { "natural": "tree" } },
+    { "type": "node", "id": 31, "lat": 21.03012, "lon": 105.85090, "tags": { "natural": "tree" } }
+  ]
+}
