@@ -15,8 +15,8 @@ const bikeShape = (() => {
 
 function wheel(r = 13, w = 7) {
   const g = new THREE.Group();
-  g.add(part(cyl(r, r, w, 18), '#2b2b30', { rot: [Math.PI / 2, 0, 0] }));
-  g.add(part(cyl(r * 0.46, r * 0.46, w + 1.5, 12), '#cfd3da', { rot: [Math.PI / 2, 0, 0], outline: false }));
+  g.add(part(cyl(r, r, w, 12), '#2b2b30', { rot: [Math.PI / 2, 0, 0] }));
+  g.add(part(cyl(r * 0.46, r * 0.46, w + 1.5, 8), '#cfd3da', { rot: [Math.PI / 2, 0, 0], outline: false }));
   const sp = part(box(r * 0.95, 2, w + 2.2), '#777', { outline: false }); g.add(sp);
   const sp2 = sp.clone(); sp2.rotation.z = Math.PI / 2; g.add(sp2);
   return g;
@@ -256,8 +256,20 @@ export function makeTree(len = 220) {
   const blobs = [[0, len * 0.8, 0, 46], [-28, len * 0.7, 10, 34], [30, len * 0.74, -8, 36], [8, len * 0.95, 0, 32], [-6, len * 0.78, -26, 30]];
   blobs.forEach(([x, y, z, r], i) => {
     const m = part(ico(r), leaf[i % 3], { pos: [x, y, z] });
+    m.userData.canopy = true;
     g.add(m);
   });
+  return g;
+}
+
+// Scenery tree: ~70 triangles (an entity tree costs ten times that). Faceted canopy of two blobs, no outline.
+export function makeTreeLite(len = 200, seed = 0) {
+  const g = new THREE.Group();
+  const leaf = ['#3f8f3f', '#4fa34f', '#5bb35b', '#449944'];
+  g.add(part(cyl(6, 10, len * 0.6, 5), '#7a5434', { pos: [0, len * 0.3, 0], outline: false }));
+  const a = Math.floor(seed * 4), b = (a + 1 + Math.floor(seed * 7)) % 4;
+  g.add(part(ico(46, 0), leaf[a], { pos: [0, len * 0.78, 0], outline: false, rot: [seed * 2, seed * 5, 0] }));
+  g.add(part(ico(32, 0), leaf[b], { pos: [(seed - 0.5) * 44, len * 0.9, (seed - 0.5) * 30], outline: false, rot: [seed * 3, seed, 0] }));
   return g;
 }
 

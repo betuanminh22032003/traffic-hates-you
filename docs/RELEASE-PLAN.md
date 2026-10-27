@@ -33,7 +33,7 @@ Game có ba đặc điểm quyết định chọn nền tảng:
    - số lượt vào trang, tỉ lệ bấm CHƠI;
    - người chơi tới được chương mấy, chết bao nhiêu lần trước khi bỏ;
    - tỉ lệ dùng điện thoại so với máy tính.
-3. **Ảnh chia sẻ mới:** ảnh hiện tại là cảnh của bản cũ (nhìn từ sau lưng, đường thẳng). Nên dựng lại một ảnh chụp từ trên cao có cổng checkpoint, ổ gà và xe ninja để khớp lối chơi thật.
+3. ~~**Ảnh chia sẻ mới**~~: đã thay ở v3.2 bằng ảnh chụp thẳng từ game (Hẻm 42: ổ gà, cọc tiêu, chó, dây điện). Muốn đổi cảnh khác thì chụp màn hình 1200×630 rồi ghi đè `public/icons/og.png`.
 4. **Quay 10–15 clip ngắn** trước ngày ra mắt rồi đăng đều mỗi ngày. Gợi ý nội dung:
    - "Tưởng qua màn rồi..." (đích giả + cục nóng rơi);
    - "Bà cụ qua đường mạnh nhất Sài Gòn";

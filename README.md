@@ -70,7 +70,7 @@ Kết nối repo, build command `npm run build`, publish directory `dist`. Khôn
 - [ ] `npm test` báo `Every chapter map is sealed by its checkpoints and every alley is passable.` (và các khu đều `ok`).
 - [ ] `npm run build` không lỗi, `npm run preview` chơi thử được chương 1; tắt mạng rồi tải lại trang vẫn chơi được.
 - [ ] Đổi link/ảnh chia sẻ nếu đăng ở chỗ khác GitHub Pages: thẻ `og:url`, `og:image` trong `game.html` phải là link tuyệt đối; ảnh ở `public/icons/og.png` (1200 × 630).
-- [ ] Đổi phiên bản trong `package.json` và chữ `v3.1` ở màn hình tiêu đề (`game.html`).
+- [ ] Đổi phiên bản trong `package.json` và chữ `v3.2` ở màn hình tiêu đề (`game.html`).
 - [ ] Không cần đổi tên cache: mỗi lần build, `sw.js` tự nhận mã phiên bản mới và danh sách file cần lưu offline.
 - [ ] Đổi cấu trúc màn/chương thì tăng khóa lưu trong `src/save.js` (`traffic-hates-you:v2` → `v3`) để save cũ không trỏ sai chỗ.
 

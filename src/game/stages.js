@@ -130,8 +130,12 @@ function buildStage(ci) {
     cor.alley.forEach(([c, r], k) => {
       if (k % 3 !== 1 || k + 1 >= cor.alley.length) return;
       const [dc, dr] = [cor.alley[k + 1][0] - c, cor.alley[k + 1][1] - r];
-      const [a, b] = k % 2 ? [-dr, dc] : [dr, -dc];
-      if (!ok(c + a, r + b) || g[r + b][c + a] !== '#' || zoneOf[r + b][c + a] >= 0) return;
+      // along an east-west alley the trees stand on the north side (a canopy on the camera side would hide
+      // the rider); along a north-south alley they alternate sides
+      const sides = dr === 0 ? [[0, -1], [0, 1]] : k % 2 ? [[-dr, dc], [dr, -dc]] : [[dr, -dc], [-dr, dc]];
+      const side = sides.find(([a, b]) => ok(c + a, r + b) && g[r + b][c + a] === '#' && zoneOf[r + b][c + a] < 0);
+      if (!side) return;
+      const [a, b] = side;
       g[r + b][c + a] = 'T';
       cor.trees.push({ k, c: c + a, r: r + b, ang: Math.atan2(-b, -a), dc, dr, ac: c, ar: r });
     });

@@ -9,8 +9,9 @@ import { makeEntityView } from './entities.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { tr } from '../i18n.js';
 
-// Camera sits high above and in front (toward +z) of the player, looking down at ~58 degrees.
-const CAM_UP = 700, CAM_BACK = 440;
+// Camera sits above and in front (toward +z) of the player, looking down at ~49 degrees: low enough that
+// facades, shop signs and the wires read as a street, high enough to see traps a block ahead.
+const CAM_UP = 600, CAM_BACK = 520;
 
 export class View {
   constructor(canvas, overlay) {
@@ -25,13 +26,13 @@ export class View {
     // soft image-based light so PBR materials don't look flat
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.45;
+    this.scene.environmentIntensity = 0.38;
     pmrem.dispose();
     this.camera = new THREE.PerspectiveCamera(40, 16 / 9, 10, 6000);
     this.hemi = new THREE.HemisphereLight('#fff', '#666', 1.2);
     this.sun = new THREE.DirectionalLight('#fff', 2.5);
     this.sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(this.sun.shadow.camera, { left: -900, right: 900, top: 900, bottom: -900, near: 10, far: 3000 });
+    Object.assign(this.sun.shadow.camera, { left: -760, right: 760, top: 760, bottom: -760, near: 10, far: 3000 });
     this.sun.shadow.bias = -0.0015; this.sun.shadow.normalBias = 1.5;
     this.scene.add(this.hemi, this.sun, this.sun.target);
     this.fog = new THREE.Fog('#fff', 1600, 4200); this.scene.fog = this.fog;
@@ -229,7 +230,7 @@ export class View {
     this.particles.update(dt);
     this.place(t);
     this.renderer.render(this.scene, this.camera);
-    const c = this.octx; c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, this.overlay.width, this.overlay.height);
+    const c = this.octx; c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, this.W, this.H); this.vignette(c);
   }
 
   /* ---------- 2D overlay ---------- */
@@ -242,6 +243,7 @@ export class View {
     const c = this.octx, s = this.uiScale();
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.clearRect(0, 0, this.W, this.H);
+    this.vignette(c);
     if (this.flash > 0) { c.fillStyle = `rgba(255,255,255,${this.flash})`; c.fillRect(0, 0, this.W, this.H); }
     // stand around too long and the game nags you
     if (w.status === 'play' && w.idle > 300 && !this.attractMode) {
@@ -259,6 +261,17 @@ export class View {
   }
 
   uiScale() { return Math.max(0.7, Math.min(1.5, Math.min(this.H, this.W) / 600)); }
+
+  // soft dark corners: pulls the eye to the street and hides the hard screen edge of the city
+  vignette(c) {
+    if (this.vgW !== this.W || this.vgH !== this.H) {
+      this.vgW = this.W; this.vgH = this.H;
+      const g = c.createRadialGradient(this.W / 2, this.H / 2, Math.min(this.W, this.H) * 0.45, this.W / 2, this.H / 2, Math.hypot(this.W, this.H) * 0.62);
+      g.addColorStop(0, 'rgba(20,12,8,0)'); g.addColorStop(1, 'rgba(20,12,8,.42)');
+      this.vg = g;
+    }
+    c.fillStyle = this.vg; c.fillRect(0, 0, this.W, this.H);
+  }
 }
 
 /* ---------- drawing helpers for the overlay ---------- */
