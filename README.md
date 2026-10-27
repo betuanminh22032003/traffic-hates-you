@@ -12,6 +12,9 @@ Game troll-platformer 3D góc nhìn cao 3/4 cố định (học theo Trees Hate 
   - *Mưa Hà Nội* (7:20): Khâm Thiên · Lê Duẩn (tàu Thống Nhất chạy giữa phố) · Nguyễn Khuyến (phố thành sông) · Phan Đình Phùng (hàng sấu ghét bạn).
   - *Tới Công Ty* (7:45, Hoàn Kiếm): Chợ Đồng Xuân · Hàng Đào · Bờ Hồ (dọc Đinh Tiên Hoàng, có Tháp Rùa; phóng xuống Hồ Gươm là chết).
 - Mỗi ô bản đồ là 8–12 m phố thật; đường lớn, ngõ, ngách, hồ, sông, công viên và tên phố đều lấy từ dữ liệu OpenStreetMap. Bẫy thì đặt tay trên từng khúc phố.
+- **Thử thách hằng ngày**: bẫy trong các ngõ nối được gieo theo ngày, ai chơi hôm đó cũng gặp đúng bộ bẫy ấy; về đích thì khoe "Thử thách 27/10: 💀 12". (`TRAP_SEED=<số ngày> node scripts/stage-test.mjs` kiểm tra ngõ của một ngày bất kỳ.)
+- **Khoe cái chết**: mỗi lần chết có nút 📸 tạo ảnh 1200×630 từ đúng khung hình đó kèm caption, gửi thẳng qua Zalo/Messenger (điện thoại) hoặc tải về + chép chữ (máy tính). Về đích thì có chuỗi emoji kiểu Wordle (💀 theo chương) và thẻ kết quả.
+- **Chết là một cảnh quay**: slow-motion, camera zoom vào, mũ bảo hiểm văng, xe nằm lăn ra đường, chữ "TOANG!" đập vào màn hình.
 - **Checkpoint**: về đích một khu là cổng sang ngõ kế tiếp mở ra; chết thì hồi sinh ngay sau cổng gần nhất.
 - **Ngõ nối giữa các khu đầy bẫy ngẫu nhiên, không báo trước**: ổ gà tàng hình, cây đổ cực nhanh, cục nóng/chậu cây rơi, xe máy ninja lao từ sau lưng. Mỗi lần chết bẫy được xếp lại.
 - **20 loại bẫy** (thêm tàu hỏa), mỗi khu có 5–12 bẫy, chơi kiểu "chết một lần là nhớ".
@@ -78,7 +81,7 @@ Kết nối repo, build command `npm run build`, publish directory `dist`. Khôn
 - [ ] `npm test` báo `Every chapter map is sealed by its checkpoints and every alley is passable.` và `OSM import works on the sample block.` (và các khu đều `ok`).
 - [ ] `npm run build` không lỗi, `npm run preview` chơi thử được chương 1; tắt mạng rồi tải lại trang vẫn chơi được.
 - [ ] Đổi link/ảnh chia sẻ nếu đăng ở chỗ khác GitHub Pages: thẻ `og:url`, `og:image` trong `game.html` phải là link tuyệt đối; ảnh ở `public/icons/og.png` (1200 × 630).
-- [ ] Đổi phiên bản trong `package.json` và chữ `v4.1` ở màn hình tiêu đề (`game.html`).
+- [ ] Đổi phiên bản trong `package.json` và chữ `v4.2` ở màn hình tiêu đề (`game.html`).
 - [ ] Không cần đổi tên cache: mỗi lần build, `sw.js` tự nhận mã phiên bản mới và danh sách file cần lưu offline.
 - [ ] Đổi cấu trúc màn/chương thì tăng khóa lưu trong `src/save.js` (`traffic-hates-you:v3` → `v4`) để save cũ không trỏ sai chỗ.
 

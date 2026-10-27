@@ -54,7 +54,7 @@ export function makeRider(c) {
   for (const z of [-9.5, 9.5]) rider.add(part(sph(1.9, 6), '#2a1f1a', { pos: [18, 39, z], outline: false }));
   g.add(rider);
   return {
-    g, wheels, rider,
+    g, wheels, rider, helm,
     spin(a) { for (const w of wheels) w.rotation.z = -a; },
     lean(v) { rider.rotation.z = -v; }
   };

@@ -3,12 +3,14 @@
 //     and with them open the whole chapter is one connected map;
 //  2. every alley between two zones can be driven through on many different rolls of its random traps,
 //     by a bot that only reacts to what it sees (jumps holes, bikes and fallen trees, never stops under a falling AC).
-import { STAGES } from '../src/game/stages.js';
+import { STAGES, setTrapSeed } from '../src/game/stages.js';
 import { makeWorld, step, T, isSolidTile } from '../src/game/logic.js';
 import { hazard } from './sim.mjs';
 
 let fail = 0;
 const ROLLS = 20;
+// TRAP_SEED=<day index> checks the alleys of that day's challenge (the game mixes the date into the rolls)
+if (process.env.TRAP_SEED) { setTrapSeed(+process.env.TRAP_SEED); console.log(`alley traps rolled with seed ${+process.env.TRAP_SEED}`); }
 
 function components(st, gatesOpen) {
   const H = st.map.length, W = st.map[0].length, id = Array.from({ length: H }, () => Array(W).fill(-1));
