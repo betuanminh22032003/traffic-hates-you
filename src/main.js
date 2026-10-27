@@ -8,12 +8,13 @@ import './style.css';
 import './polyfills.js';
 import { makeWorld, step, KMH, T } from './game/logic.js';
 import { LEVELS, CHAPTERS } from './game/levels.js';
-import { STAGES } from './game/stages.js';
+import { STAGES, setTrapSeed } from './game/stages.js';
 import { deathText, HEAD, taunt, CALLS } from './game/messages.js';
 import { View } from './render/view.js';
 import * as A from './audio.js';
 import { store, save, resetProgress } from './save.js';
 import { tr, setLang, getLang, autoLang, LANGS, translatePage } from './i18n.js';
+import { composeCard, shareCard } from './share.js';
 
 const $ = id => document.getElementById(id);
 const S = store();
@@ -34,6 +35,7 @@ let rolls = [];              // deaths in the alley leading to each zone (only r
 let grabbed = false;         // a ride ("gọi xe ôm") skipped part of this stage: no record for it
 let causeCount = {}, grabTried = false, fakeAt = -1, callUntil = -1;
 let attractWorld = null;
+let streak = 0;              // zones cleared in a row without a death (for the checkpoint toast)
 let frozen = false;          // test hook: stop real-time stepping
 let returnTo = 's-title';    // where "back" from settings/select goes
 const theme = i => CHAPTERS[STAGES[i].ch].theme;
@@ -57,6 +59,11 @@ const runLevel = () => S.run.level ?? 0;
 // (clamped: an old or edited save could point past the chapter's last checkpoint)
 const runCp = () => Math.max(0, Math.min(S.run.cp ?? 0, (STAGES[runLevel()]?.zones.length ?? 1) - 1));
 const canContinue = () => (runLevel() > 0 || runCp() > 0) && runLevel() < STAGES.length;
+// Daily challenge: the alley traps are rolled from today's date, so everyone gets the same run to compare.
+const dayIndex = () => { const d = new Date(); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000); };
+const dayLabel = () => { const d = new Date(); return `${d.getDate()}/${d.getMonth() + 1}`; };
+const dailyDone = () => S.daily?.day === dayIndex() ? S.daily.best : null;
+function refreshDaily() { const b = dailyDone(); $('b-daily').textContent = b == null ? tr('🔥 THỬ THÁCH HÔM NAY') : tr(`🔥 THỬ THÁCH HÔM NAY · 💀 ${b}`); }
 
 function goTitle() {
   mode = 'title'; setHud(false); hideCards();
@@ -66,6 +73,7 @@ function goTitle() {
   world = null;
   $('b-play').textContent = tr(canContinue() ? `TIẾP TỤC · CHƯƠNG ${runLevel() + 1}` : 'CHƠI');
   $('b-new').classList.toggle('hidden', !canContinue());
+  refreshDaily();
   $('title-hint').textContent = tr(isTouch ? 'Cần gạt trái: chạy · ⤒ nhảy · 🐢 giữ để chạy chậm' : '←↑→↓ / WASD chạy · SPACE nhảy · giữ SHIFT chạy chậm · R chơi lại · ESC tạm dừng');
   show('s-title');
   A.playMusic(0);
@@ -122,7 +130,7 @@ function applyLang() {
   setLang(S.settings.lang ?? autoLang());
   translatePage();
   refreshSettings();
-  if (mode === 'title') $('b-play').textContent = tr(canContinue() ? `TIẾP TỤC · CHƯƠNG ${runLevel() + 1}` : 'CHƠI');
+  if (mode === 'title') { $('b-play').textContent = tr(canContinue() ? `TIẾP TỤC · CHƯƠNG ${runLevel() + 1}` : 'CHƠI'); refreshDaily(); }
   $('title-hint').textContent = tr(isTouch ? 'Cần gạt trái: chạy · ⤒ nhảy · 🐢 giữ để chạy chậm' : '←↑→↓ / WASD chạy · SPACE nhảy · giữ SHIFT chạy chậm · R chơi lại · ESC tạm dừng');
   if (!$('s-select').classList.contains('hidden')) buildSelect();
 }
@@ -149,6 +157,7 @@ $('b-play').addEventListener('mouseenter', () => {
 });
 $('b-play').onclick = () => { A.sfx('click'); if (canContinue()) startLevel(runLevel(), true, false, runCp(), true); else newRun(); };
 $('b-new').onclick = () => { A.sfx('click'); newRun(); };
+$('b-daily').onclick = () => { A.sfx('click'); newRun(dayIndex()); };
 $('b-select').onclick = () => { A.sfx('click'); buildSelect(); returnTo = 's-title'; show('s-select'); };
 $('b-settings').onclick = () => { A.sfx('click'); refreshSettings(); returnTo = 's-title'; show('s-settings'); };
 $('b-credits').onclick = (e) => { e.preventDefault(); A.sfx('click'); returnTo = 's-title'; show('s-credits'); };
@@ -163,7 +172,7 @@ $('e-menu').onclick = () => { A.sfx('click'); goTitle(); };
 $('e-share').onclick = share;
 
 // A story run counts for the record only when it was played from level 1 in order.
-function newRun() { S.run = { deaths: 0, perLevel: {}, level: 0, cp: 0, full: true, att: null }; save(); startLevel(0, true); }
+function newRun(daily = 0) { S.run = { deaths: 0, perLevel: {}, level: 0, cp: 0, full: true, att: null, daily }; streak = 0; save(); startLevel(0, true); }
 
 /* ---------- level flow ---------- */
 // A stage is a whole chapter in one map; cp = the checkpoint (zone) to start from.
@@ -176,6 +185,7 @@ function startLevel(i, intro, fromSelect = false, cp = 0, resume = false) {
   grabbed = !!a?.grabbed;
   lvIdx = i; jumpQueued = false; causeCount = {}; grabTried = false;
   S.run.level = i; S.run.cp = cp; saveStage();
+  setTrapSeed(S.run.daily || 0);
   world = makeWorld(STAGES[i], { attempts, rolls, cp });
   levelDeaths = attempts[cp] + rolls[cp];
   view.attractMode = false;
@@ -251,7 +261,10 @@ function onClear() {
 }
 function onCheckpoint(d) {
   S.run.cp = d.zone; saveStage();
-  toast(tr('🚩 CHECKPOINT · ') + tr(d.name));
+  const z = d.zone - 1, clean = (attempts[z] ?? 0) === 0 && (rolls[z] ?? 0) === 0;
+  streak = clean ? streak + 1 : 0;
+  toast(tr('🚩 CHECKPOINT · ') + tr(d.name) + (streak >= 2 ? tr(` · 🔥 ${streak} khu liền không chết!`) : ''));
+  if (streak >= 2) A.sfx('win');
   updateHud(true);
 }
 function showClearCard() {
@@ -267,6 +280,22 @@ function nextLevel() {
 }
 
 function clockMin() { return START_MIN + (zonesBefore(lvIdx) + (lvIdx < STAGES.length ? world?.cp ?? 0 : 0)) * PER_LEVEL_MIN + S.run.deaths + (S.run.penalty || 0); }
+
+// "Share this death": the frame you died in, with the caption, as a picture for the group chat.
+$('dead-share').addEventListener('pointerdown', (e) => e.stopPropagation());
+$('dead-share').onclick = async (e) => {
+  e.stopPropagation(); A.sfx('click');
+  const msg = $('dead-msg').textContent, zoneName = tr(STAGES[lvIdx].zones[world.cp].name);
+  const cv = composeCard({ frame: view.snapshot(), head: $('dead-head').textContent, msg, sub: tr(`Lần chết thứ ${S.run.deaths}`) + ' · ' + zoneName, foot: location.host + location.pathname });
+  const r = await shareCard(cv, { text: tr(`Lần chết thứ ${S.run.deaths} trong Traffic Hates You 🛵💀: `) + msg, url: location.href, filename: `traffic-hates-you-toang-${S.run.deaths}.png` });
+  shareToast(r);
+};
+function shareToast(r) {
+  if (r === 'saved') toast('Đã lưu ảnh và chép chữ, đăng lên thôi!');
+  else if (r === 'copied') toast('Đã chép, dán cho bạn bè nhé!');
+  else if (r === 'shared') toast('Đã khoe 😎');
+  else if (r === 'failed') toast('Không chia sẻ được trên trình duyệt này');
+}
 
 // "Skip level" help that trolls you once: the first driver always cancels.
 $('dead-grab').addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -295,19 +324,31 @@ function ending() {
   save();
   $('end-time').textContent = tr(`Đến công ty lúc ${fmt(m)}!`);
   $('end-late').textContent = tr(late > 0 ? `(muộn ${late} phút... bị trừ lương)` : 'Đúng giờ! Siêu nhân thật sự!');
-  $('end-stats').innerHTML = `${tr('💀 Số lần chết:')} <b>${S.run.deaths}</b>` + (S.bestRun != null ? `${tr(' · Kỷ lục:')} <b>${S.bestRun}</b>` : '') +
+  let daily = '';
+  if (S.run.daily) {
+    if (S.daily?.day !== dayIndex() || S.run.deaths < S.daily.best) S.daily = { day: dayIndex(), best: S.run.deaths };
+    save();
+    daily = `<br>${tr('🔥 Thử thách hôm nay')} ${dayLabel()} · ${tr('kỷ lục hôm nay')} 💀 <b>${S.daily.best}</b>`;
+  }
+  $('end-stats').innerHTML = `${tr('💀 Số lần chết:')} <b>${S.run.deaths}</b>` + (S.bestRun != null ? `${tr(' · Kỷ lục:')} <b>${S.bestRun}</b>` : '') + daily +
     (full ? '' : `<br><small>${tr('(Lượt này có chọn chương hoặc gọi xe ôm nên không tính kỷ lục)')}</small>`) +
     `<br>${tr(`Tổng cộng đã chết ${S.totalDeaths} lần trên đường đi làm.`)}`;
+  $('end-grid').textContent = emojiGrid();
   show('s-end');
   A.sfx('win');
 }
 
+// Wordle-style result: one line per chapter, a skull per death.
+const chapterDeaths = i => STAGES[i].zones.reduce((n, z) => n + (S.run.perLevel[z.level.id] || 0), 0);
+function emojiGrid(sep = '\n') {
+  return STAGES.map((st, i) => { const n = chapterDeaths(i); return `C${i + 1} ` + (n === 0 ? '✅' : n <= 8 ? '💀'.repeat(n) : `💀x${n}`); }).join(sep);
+}
 async function share() {
-  const text = tr(`Mình vừa đến công ty lúc ${fmt(clockMin())} sau ${S.run.deaths} lần "toang" trong Traffic Hates You 🛵💀. Thử làm ít hơn xem!`);
-  try {
-    if (navigator.share) { await navigator.share({ title: 'Traffic Hates You', text, url: location.href }); return; }
-    await navigator.clipboard.writeText(text + ' ' + location.href); toast('Đã chép, dán cho bạn bè nhé!');
-  } catch (e) { /* cancelled */ }
+  const m = clockMin(), late = m - 8 * 60;
+  const head = (S.run.daily ? tr('🔥 Thử thách hôm nay') + ' ' + dayLabel() + ' · ' : '') + 'Traffic Hates You 🛵';
+  const text = `${head}\n${emojiGrid()}\n${tr(`⏰ Đến công ty lúc ${fmt(m)}`)}${late > 0 ? tr(` (muộn ${late} phút)`) : ''}\n${tr('Thử làm ít hơn xem!')}`;
+  const cv = composeCard({ frame: view.snapshot(), head: `💀 ${S.run.deaths}`, msg: tr(`Đến công ty lúc ${fmt(m)} sau ${S.run.deaths} lần toang`), sub: emojiGrid('   '), foot: location.host + location.pathname, tint: '#ffd23f' });
+  shareToast(await shareCard(cv, { text, url: location.href, filename: 'traffic-hates-you-ket-qua.png' }));
 }
 
 function pause(on) {
@@ -477,9 +518,10 @@ function frame(now) {
   let mx = kx + stick.x + (pad.x || 0), mz = kz + stick.y + (pad.y || 0);
   const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
   const inp = { mx, mz, slow: slowHeld() || padSlow };
-  if (mode === 'chapter') { chapterT += dt; if (chapterT > 110) endChapterSplash(); }
+  if (mode === 'chapter') { chapterT += dt; if (chapterT > 85) endChapterSplash(); }
   if (mode === 'play' && !frozen) {
-    acc += dt; let n = 0;
+    // a death plays in slow motion for half a second: the replay you want in the clip
+    acc += dt * (world.status === 'dead' && world.deadT < 30 ? 0.3 : 1); let n = 0;
     while (acc >= 1 && n < 5) { tick({ ...inp, jump: jumpQueued }); jumpQueued = false; acc -= 1; n++; }
     if (n === 5) acc = 0;
     if (fakeAt >= 0 && world.t - fakeAt > 52) { $('c-clear').classList.add('hidden'); fakeAt = -1; }

@@ -38,7 +38,7 @@ export class View {
     this.fog = new THREE.Fog('#fff', 1600, 4200); this.scene.fog = this.fog;
     this.dyn = new THREE.Group(); this.scene.add(this.dyn);
     this.cam = new THREE.Vector3(); this.look = new THREE.Vector3();
-    this.shake = 0; this.flash = 0; this.heading = 0; this.bank = 0;
+    this.shake = 0; this.flash = 0; this.heading = 0; this.bank = 0; this.zoomK = 1;
     this.world = null; this.worldKey = null; this.views = [];
     this.particles = new Particles(this.scene);
     this.quality = 'high';
@@ -120,7 +120,9 @@ export class View {
     this.prev = { x: p.x, h: p.h, z: p.z };
     this.heading = p.heading; this.bank = 0;
     this.placeTarget(p.x, p.h, p.z, true);
-    this.shake = 0; this.flash = 0;
+    this.shake = 0; this.flash = 0; this.zoomK = 1;
+    // the helmet flies off on death; remember where it sits
+    this.helm = r.helm; this.helmHome = r.helm.position.clone(); this.helmRot = r.helm.rotation.clone(); this.helmV = null;
   }
 
   /* ---------- logic events -> effects ---------- */
@@ -130,7 +132,7 @@ export class View {
       case 'crack': this.shake = 7; for (let i = 0; i < 16; i++) P.burst(d.x + (Math.random() - 0.5) * d.w, 0, d.z + (Math.random() - 0.5) * 60, 1, '#6b6a75', 4, 7); break;
       case 'thud': this.shake = d?.big ? 12 : 8; if (d) for (let i = 0; i < 10; i++) P.burst(d.x + (Math.random() - 0.5) * 60, 4, d.z + (Math.random() - 0.5) * 60, 1, '#b9a68a', 4, 7); break;
       case 'geyser': this.shake = 8; break;
-      case 'die': this.shake = 16; P.burst(p.x, p.h + 30, p.z, 26, '#ffd23f', 7, 6); if (d.cause === 'zap') P.burst(p.x, p.h + 30, p.z, 20, '#bfe6ff', 9, 4); break;
+      case 'die': this.shake = 16; P.burst(p.x, p.h + 30, p.z, 26, '#ffd23f', 7, 6); if (d.cause === 'zap') P.burst(p.x, p.h + 30, p.z, 20, '#bfe6ff', 9, 4); this.helmV = { x: (Math.random() - 0.5) * 2.5, y: 6 + Math.random() * 3, z: (Math.random() - 0.5) * 2.5, r: (Math.random() - 0.5) * 0.5 }; break;
       case 'win': for (let i = 0; i < 40; i++) P.burst(p.x, p.h + 60, p.z, 1, ['#ffd23f', '#e63946', '#4d7cfe', '#34c759'][i % 4], 8, 6); break;
       case 'land': P.burst(p.x, p.h, p.z, Math.min(10, d.air / 4), '#b9a68a', 2.5, 5, 0.15); break;
       case 'jump': P.burst(p.x, p.h, p.z, 4, '#cfc5b5', 1.5, 4, 0.1); break;
@@ -158,7 +160,11 @@ export class View {
     const overHole = ph < -2 || isVoidTile(ground) || w.ents.some(e => e.k === 'hole' && e.open && px > e.x + 6 && px < e.x + e.w - 6 && pz > e.z + 6 && pz < e.z + e.d - 6);
     pl.blob.visible = !settings.shadows && !overHole && w.status !== 'dead';
     if (pl.blob.visible) { const gy = p.onPlat ? ph : 0, hh = Math.max(0, ph - gy); pl.blob.position.set(px, gy + 0.8, pz); pl.blob.scale.setScalar(Math.max(0.4, 1 - hh / 250)); }
-    if (w.status === 'dead') { pl.tumble.position.y = 30; pl.r.g.position.y = -30; pl.tumble.rotation.z = -p.spin; pl.tumble.rotation.x = 0; }
+    if (w.status === 'dead') {
+      pl.tumble.position.y = 30; pl.r.g.position.y = -30; pl.tumble.rotation.z = -p.spin; pl.tumble.rotation.x = 0;
+      const hv = this.helmV, hm = this.helm;
+      if (hv && dt) { hm.position.x += hv.x * dt; hm.position.y += hv.y * dt; hm.position.z += hv.z * dt; hv.y -= 0.3 * dt; hm.rotation.z += hv.r * dt; hm.rotation.x += 0.2 * dt; }
+    }
     else {
       pl.tumble.position.y = 0; pl.r.g.position.y = 0;
       pl.tumble.rotation.z = p.onGround ? 0 : Math.max(-0.3, Math.min(0.3, p.vh * 0.025));
@@ -186,7 +192,9 @@ export class View {
       }
     }
     this.particles.update(dt);
-    if (w.status !== 'dead') this.placeTarget(px, ph, pz, false, dt);
+    // death: the camera keeps following and pushes in for the slow-motion replay
+    this.placeTarget(px, ph, pz, false, dt, w.status === 'dead');
+    const zt = w.status === 'dead' ? 0.6 : 1; this.zoomK += (zt - this.zoomK) * Math.min(1, 0.07 * (dt || 0));
     this.shake *= Math.pow(0.86, dt);
     this.flash = Math.max(0, this.flash - 0.04 * dt);
     this.place(t);
@@ -195,13 +203,13 @@ export class View {
   }
 
   // Follow the player, but keep the view inside the map so small levels sit still like a diorama.
-  placeTarget(px, ph, pz, snap, dt = 1) {
+  placeTarget(px, ph, pz, snap, dt = 1, dead = false) {
     const m = this.map, W = m.W * T, H = m.H * T;
     const z = this.zoom || 1, dist = Math.hypot(CAM_UP, CAM_BACK) * z;
     const halfW = dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.camera.aspect * 0.92;
     const halfD = dist * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 1.1;
     const fit = (v, size, half) => (size <= half * 2 ? size / 2 : Math.max(half - T * 0.6, Math.min(size - half + T * 0.6, v)));
-    const lx = fit(px, W, halfW), lz = fit(pz, H, halfD) + 10, ly = Math.max(0, ph) * 0.3;
+    const lx = fit(px, W, halfW), lz = fit(pz, H, halfD) + 10, ly = Math.max(0, ph) * (dead ? 0.85 : 0.3); // a dead rider up in the wires stays in the picture
     const cx = lx, cy = CAM_UP * z + ly, cz = lz + CAM_BACK * z;
     if (snap) { this.look.set(lx, ly, lz); this.cam.set(cx, cy, cz); return; }
     const a = Math.min(1, 0.09 * dt);
@@ -211,7 +219,8 @@ export class View {
 
   place(t) {
     const s = this.shake, cam = this.camera;
-    cam.position.set(this.cam.x + (Math.random() - 0.5) * s, this.cam.y + (Math.random() - 0.5) * s, this.cam.z + (Math.random() - 0.5) * s);
+    const k = this.zoomK ?? 1, L = this.look;
+    cam.position.set(L.x + (this.cam.x - L.x) * k + (Math.random() - 0.5) * s, L.y + (this.cam.y - L.y) * k + (Math.random() - 0.5) * s, L.z + (this.cam.z - L.z) * k + (Math.random() - 0.5) * s);
     cam.lookAt(this.look);
     this.sun.position.set(this.look.x - 400, 1100, this.look.z + 300);
     this.sun.target.position.set(this.look.x, 0, this.look.z - 100);
@@ -233,6 +242,14 @@ export class View {
     this.place(t);
     this.renderer.render(this.scene, this.camera);
     const c = this.octx; c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); c.clearRect(0, 0, this.W, this.H); this.vignette(c);
+  }
+
+  // The current picture (3D frame plus speech bubbles) as a canvas, for share cards.
+  snapshot() {
+    this.renderer.render(this.scene, this.camera);
+    const c = document.createElement('canvas'); c.width = this.canvas.width; c.height = this.canvas.height;
+    const g = c.getContext('2d'); g.drawImage(this.canvas, 0, 0); g.drawImage(this.overlay, 0, 0, c.width, c.height);
+    return c;
   }
 
   /* ---------- 2D overlay ---------- */

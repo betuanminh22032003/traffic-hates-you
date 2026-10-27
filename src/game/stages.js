@@ -210,9 +210,13 @@ function buildEnts(stage, attempts, cp, rolls = []) {
   return out;
 }
 
+// The daily challenge mixes the day into every alley roll, so everyone playing that day meets the same traps.
+let trapSeed = 0;
+export function setTrapSeed(n) { trapSeed = (n | 0) >>> 0; }
+
 // A fresh mix of nasty surprises in every alley, different after each death. No warnings.
 function alleyTraps(stage, cor, zone, attempt) {
-  const r = rng(stage.id * 7919 + zone * 104729 + attempt * 15485863);
+  const r = rng(stage.id * 7919 + zone * 104729 + attempt * 15485863 + trapSeed * 2246822519);
   const cells = cor.alley, out = [], n = cells.length, map = stage.map;
   const dirAt = i => [cells[i + 1][0] - cells[i][0], cells[i + 1][1] - cells[i][1]];
   const straight = i => i > 0 && i < n - 1 && cells[i - 1][0] + cells[i + 1][0] === 2 * cells[i][0] && cells[i - 1][1] + cells[i + 1][1] === 2 * cells[i][1];

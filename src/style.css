@@ -135,12 +135,17 @@ h2 { margin: 0; font-size: clamp(30px, 6vw, 52px); color: var(--gold); letter-sp
 @keyframes pop { from { transform: scale(.3); opacity: 0; } }
 
 /* death / clear overlays */
-.card-ov { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-  background: rgba(20,14,10,.6); padding: 16px; text-align: center; animation: fade .25s both; }
-.card-ov.clear { background: transparent; pointer-events: none; }
+.card-ov { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 12px;
+  background: rgba(20,14,10,.6); padding: 16px 16px calc(3vh + 12px + var(--safe-b)); text-align: center; animation: fade .25s both; }
+.card-ov.clear { background: transparent; pointer-events: none; justify-content: center; }
 @keyframes fade { from { opacity: 0; } }
-.card-ov .head { font-size: clamp(48px, 11vw, 92px); color: var(--red); line-height: 1; animation: pop .35s cubic-bezier(.2,1.6,.4,1) both; }
-.card-ov .head.ok { color: var(--green); }
+.card-ov .head { font-size: clamp(54px, 12vw, 104px); color: var(--red); line-height: 1; animation: slam .42s cubic-bezier(.1,1.4,.3,1) both; transform: rotate(-4deg); }
+@keyframes slam { from { transform: scale(3.2) rotate(8deg); opacity: 0; } 60% { transform: scale(.94) rotate(-5deg); opacity: 1; } to { transform: scale(1) rotate(-4deg); } }
+.card-ov .menu.row.small { gap: 8px; min-width: 0; }
+.btn.small.share { background: #2a9d8f; }
+.btn.fire { background: #f4a300; }
+.end-grid { margin: 0; font: 700 clamp(15px, 2.8vw, 22px)/1.45 var(--font); text-align: center; text-shadow: 0 2px 0 var(--ink); white-space: pre-wrap; animation: fade .5s 1s both; }
+.card-ov .head.ok { color: var(--green); animation: pop .35s cubic-bezier(.2,1.6,.4,1) both; transform: none; }
 .card-ov .msg { font-weight: 800; font-size: clamp(18px, 3.4vw, 28px); max-width: 760px; text-shadow: 0 2px 0 var(--ink), 0 -1px 0 var(--ink), 2px 0 0 var(--ink), -2px 0 0 var(--ink); }
 .card-ov .sub { font-weight: 700; color: var(--gold); font-size: clamp(14px, 2.4vw, 19px); text-shadow: 0 2px 0 var(--ink); }
 .card-ov .taunt { color: #ffb4a8; }

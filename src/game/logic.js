@@ -555,6 +555,16 @@ export function step(w, inp, dt = 1, ev = noop) {
   if (inp.jump && w.status === 'play') p.jumpBuf = 8;
   for (const e of w.ents) KINDS[e.k]?.update?.(w, e, dt, ev);
   if (w.status === 'play') updPlayer(w, inp, dt, ev);
-  else if (w.status === 'dead') { w.deadT += dt; p.vh -= GRAV * dt; p.h += p.vh * dt; p.x += p.vx * dt; p.z += p.vz * dt; p.spin += 0.22 * dt; }
+  else if (w.status === 'dead') {
+    w.deadT += dt; p.vh -= GRAV * dt; p.h += p.vh * dt; p.x += p.vx * dt; p.z += p.vz * dt;
+    // the wreck bounces once and lies on the road instead of sinking through it (unless it fell into something)
+    const sunk = w.cause === 'fall' || w.cause === 'lake' || w.cause === 'river' || w.cause === 'flood';
+    if (!sunk && p.h < 0) {
+      p.h = 0;
+      if (p.vh < -2.5) { p.vh = -p.vh * 0.35; p.vx *= 0.5; p.vz *= 0.5; } else { p.vh = 0; p.vx *= 0.7; p.vz *= 0.7; }
+    }
+    if (p.h > 0 || sunk) p.spin += 0.22 * dt;
+    else { const rest = Math.round((p.spin - Math.PI / 2) / Math.PI) * Math.PI + Math.PI / 2; p.spin += (rest - p.spin) * Math.min(1, 0.25 * dt); }
+  }
   else if (w.status === 'clear') { w.clearT += dt; p.spin += 0.15 * dt; }
 }
