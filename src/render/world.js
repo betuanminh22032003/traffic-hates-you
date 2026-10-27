@@ -1,31 +1,32 @@
 // Static scenery for a level built from its tile map: roads, pavements, grass, canals and pits,
-// tube houses with shop signs and rooftop clutter, trees, flood water, a city border, and rain.
-// Static meshes are merged per material ("baked") so the whole street costs a few dozen draw calls.
+// tube houses with shop signs and rooftop clutter, trees, electric poles with wire spaghetti, flood water,
+// a city border, and rain. Static meshes are merged ("baked") per material and per 6x6-tile chunk, so the
+// whole street costs a few dozen draw calls and the parts of a big chapter map that are off screen are culled.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { part, box, cyl, ico, M, std, canvasTex, fontPx, settings, disposeTree } from './toon.js';
-import { makeTree, makeParkedBike } from './models.js';
+import { part, box, cyl, ico, M, std, canvasTex, fontPx, settings, disposeTree, outlineMat } from './toon.js';
+import { makeTreeLite, makeParkedBike } from './models.js';
 import { T, isSolidTile, isVoidTile } from '../game/logic.js';
 
 export const THEMES = {
   dawn: {
-    sky: ['#ff9f6e', '#ffc98f', '#ffeccc'], sun: '#fff1c9', sunXY: [-0.25, 0.42], light: '#ffd6ad', li: 2.3,
-    hemi: ['#ffe0c0', '#6b5a52'], hi: 1.15, fog: '#f6cfa8', road: '#4b4a55', walk: '#cdb79a',
+    sky: ['#ff9f6e', '#ffc98f', '#ffeccc'], sun: '#fff1c9', light: '#ffd6ad', li: 2.6,
+    hemi: ['#ffe0c0', '#6b5a52'], hi: 0.95, fog: '#f6cfa8', road: '#4b4a55', walk: '#cdb79a',
     houses: ['#f4c95d', '#6cc4b8', '#f29e9e', '#9ccc65', '#7fb3e6', '#f7a35c', '#c9a0dc', '#fff1c1'], far: '#d7a89a', farther: '#e9bfa6'
   },
   day: {
-    sky: ['#4fa8ea', '#8fd0f7', '#d9f1fb'], sun: '#fffbe6', sunXY: [0.3, 0.7], light: '#fff6e8', li: 2.6,
-    hemi: ['#d6efff', '#6b6458'], hi: 1.2, fog: '#cfeaf7', road: '#4b4a55', walk: '#cdb79a',
+    sky: ['#4fa8ea', '#8fd0f7', '#d9f1fb'], sun: '#fffbe6', light: '#fff6e8', li: 2.9,
+    hemi: ['#d6efff', '#6b6458'], hi: 1.0, fog: '#cfeaf7', road: '#4b4a55', walk: '#cdb79a',
     houses: ['#f4c95d', '#6cc4b8', '#f29e9e', '#9ccc65', '#7fb3e6', '#f7a35c', '#c9a0dc', '#fff1c1'], far: '#a9c9de', farther: '#c4dceb'
   },
   rain: {
-    sky: ['#5d6b7a', '#7f8d9b', '#a9b4bf'], sun: null, light: '#dfe8f2', li: 1.4,
-    hemi: ['#b8c6d4', '#40464f'], hi: 1.25, fog: '#8e9aa6', road: '#3a3944', walk: '#a8987f', rain: true,
+    sky: ['#5d6b7a', '#7f8d9b', '#a9b4bf'], sun: null, light: '#dfe8f2', li: 1.5,
+    hemi: ['#b8c6d4', '#40464f'], hi: 1.1, fog: '#8e9aa6', road: '#3a3944', walk: '#a8987f', rain: true,
     houses: ['#c9a84f', '#5aa59b', '#c98585', '#84ad58', '#6b97c4', '#d08a4f', '#a888bb', '#d8cfa8'], far: '#7d8a98', farther: '#93a0ad'
   },
   office: {
-    sky: ['#3d9be9', '#86c9f5', '#e6f6ff'], sun: '#ffffff', sunXY: [0.2, 0.75], light: '#ffffff', li: 2.7,
-    hemi: ['#dff2ff', '#6b6458'], hi: 1.2, fog: '#d4ecfa', road: '#4b4a55', walk: '#d3c5b0', towers: true,
+    sky: ['#3d9be9', '#86c9f5', '#e6f6ff'], sun: '#ffffff', light: '#ffffff', li: 3.0,
+    hemi: ['#dff2ff', '#6b6458'], hi: 1.0, fog: '#d4ecfa', road: '#4b4a55', walk: '#d3c5b0',
     houses: ['#e9eef2', '#9fc5e8', '#f4c95d', '#cfd8dc', '#b0bec5', '#f7a35c', '#7fb3e6', '#fff1c1'], far: '#9fbfd6', farther: '#bdd5e6'
   }
 };
@@ -77,26 +78,21 @@ function textures() {
       c.fillText(s, 128, y + 34);
     });
   });
-  const windowsTower = canvasTex(64, 64, (c) => {
-    c.fillStyle = '#fff'; c.fillRect(0, 0, 64, 64);
-    c.fillStyle = '#5b7fa3'; for (let x = 4; x < 64; x += 16) c.fillRect(x, 6, 10, 52);
-  });
-  windowsTower.wrapS = windowsTower.wrapT = THREE.RepeatWrapping;
   // grayscale detail maps, tinted by the theme colour through material.color
   const noise = (c, w, h, n, a0, a1, sz) => { for (let i = 0; i < n; i++) { const v = Math.random(); c.fillStyle = `rgba(0,0,0,${a0 + v * (a1 - a0)})`; c.fillRect(Math.random() * w, Math.random() * h, sz * (0.5 + v), sz * (0.5 + v)); } };
   const asphalt = canvasTex(256, 256, (c, w, h) => {
     c.fillStyle = '#e8e8e8'; c.fillRect(0, 0, w, h);
-    noise(c, w, h, 2600, 0.04, 0.22, 2.2);
-    for (let i = 0; i < 6; i++) { c.fillStyle = `rgba(0,0,0,${0.05 + Math.random() * 0.06})`; c.beginPath(); c.ellipse(Math.random() * w, Math.random() * h, 20 + Math.random() * 40, 10 + Math.random() * 25, Math.random() * 3, 0, 7); c.fill(); }
-    c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 1.2;
-    for (let i = 0; i < 3; i++) { let x = Math.random() * w, y = Math.random() * h; c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (Math.random() - 0.5) * 30; y += (Math.random() - 0.3) * 20; c.lineTo(x, y); } c.stroke(); }
+    noise(c, w, h, 1400, 0.03, 0.11, 2);
+    for (let i = 0; i < 5; i++) { c.fillStyle = `rgba(0,0,0,${0.04 + Math.random() * 0.05})`; c.beginPath(); c.ellipse(Math.random() * w, Math.random() * h, 30 + Math.random() * 50, 14 + Math.random() * 30, Math.random() * 3, 0, 7); c.fill(); }
+    c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 1.2;
+    for (let i = 0; i < 2; i++) { let x = Math.random() * w, y = Math.random() * h; c.beginPath(); c.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (Math.random() - 0.5) * 30; y += (Math.random() - 0.3) * 20; c.lineTo(x, y); } c.stroke(); }
   });
   asphalt.wrapS = asphalt.wrapT = THREE.RepeatWrapping;
   const tiles = canvasTex(128, 128, (c, w, h) => {
     c.fillStyle = '#efefef'; c.fillRect(0, 0, w, h);
     for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { c.fillStyle = `rgba(0,0,0,${Math.random() * 0.08})`; c.fillRect(i * 32 + 1, j * 32 + 1, 30, 30); }
-    noise(c, w, h, 500, 0.02, 0.1, 1.5);
-    c.fillStyle = 'rgba(0,0,0,.28)'; for (let k = 0; k <= 4; k++) { c.fillRect(k * 32 - 1, 0, 2, h); c.fillRect(0, k * 32 - 1, w, 2); }
+    noise(c, w, h, 400, 0.02, 0.08, 1.5);
+    c.fillStyle = 'rgba(0,0,0,.24)'; for (let k = 0; k <= 4; k++) { c.fillRect(k * 32 - 1, 0, 2, h); c.fillRect(0, k * 32 - 1, w, 2); }
   });
   tiles.wrapS = tiles.wrapT = THREE.RepeatWrapping;
   // grime on facades
@@ -105,7 +101,17 @@ function textures() {
     const g = c.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(60,40,20,.12)');
     c.fillStyle = g; c.fillRect(0, 0, 128, 128); noise(c, 128, 128, 300, 0.02, 0.07, 2); f.needsUpdate = true;
   }
-  TEX = { facade: [facade, facade2], shutter, shop, atlas, windowsTower, asphalt, tiles };
+  // contact shadow where the ground meets a wall: dark at u=0, clear at u=1
+  const ao = canvasTex(64, 4, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, w, 0); g.addColorStop(0, 'rgba(20,12,8,.5)'); g.addColorStop(0.35, 'rgba(20,12,8,.2)'); g.addColorStop(1, 'rgba(20,12,8,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+  });
+  // pit walls: lit earth at the top fading into the dark
+  const dirt = canvasTex(4, 64, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#1a100a'); g.addColorStop(0.55, '#3b281a'); g.addColorStop(1, '#6a4a32');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+  });
+  TEX = { facade: [facade, facade2], shutter, shop, atlas, asphalt, tiles, ao, dirt };
   return TEX;
 }
 
@@ -150,6 +156,24 @@ function facePlane(w, h, mat, ru = 1, rv = 1, v0 = 0, v1 = 1) {
 }
 
 /* ---------- baking ---------- */
+// Every plain-coloured standard material becomes one vertex-coloured material, every tinted facade one per
+// texture: a chunk of city is then a handful of draw calls instead of one per colour.
+const CHUNK = 6 * T;
+let _plain, _aoMat, _dirtMat;
+const plainMat = () => (_plain ??= std({ vertexColors: true }));
+const facadeVC = new Map();
+const facadeVCMat = tex => { if (!facadeVC.has(tex)) facadeVC.set(tex, std({ map: tex, vertexColors: true })); return facadeVC.get(tex); };
+const aoMat = () => (_aoMat ??= new THREE.MeshBasicMaterial({ map: textures().ao, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }));
+const dirtMat = () => (_dirtMat ??= std({ map: textures().dirt, roughness: 1 }));
+function bucketOf(o) {
+  const m = o.material, T_ = textures();
+  if (o.userData.outline) return { key: 'outline', mat: outlineMat, vc: false };
+  const plain = m.isMeshStandardMaterial && !m.transparent && !m.userData.own && !(m.emissive && (m.emissive.r || m.emissive.g || m.emissive.b));
+  if (plain && !m.map && Math.abs(m.roughness - 0.82) < 0.01 && !m.metalness) return { key: 'plain', mat: plainMat(), vc: true };
+  if (plain && m.map && T_.facade.includes(m.map)) return { key: 'facade' + m.map.uuid, mat: facadeVCMat(m.map), vc: true };
+  return { key: m.uuid, mat: m, vc: false };
+}
+const _bb = new THREE.Box3(), _c = new THREE.Vector3();
 function bake(root) {
   root.updateMatrixWorld(true);
   const buckets = new Map();
@@ -160,10 +184,17 @@ function bake(root) {
     for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
     if (!g.attributes.normal) g.computeVertexNormals();
-    const key = o.material.uuid;
-    if (!buckets.has(key)) buckets.set(key, { mat: o.material, geos: [], cast: false, outline: !!o.userData.outline });
-    const b = buckets.get(key);
-    b.geos.push(g); if (o.castShadow) b.cast = true;
+    const b = bucketOf(o);
+    if (b.vc) {
+      const n = g.attributes.position.count, col = new Float32Array(n * 3), c = o.material.color;
+      for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    }
+    g.computeBoundingBox(); g.boundingBox.getCenter(_c);
+    const key = b.key + '|' + Math.floor(_c.x / CHUNK) + ',' + Math.floor(_c.z / CHUNK);
+    if (!buckets.has(key)) buckets.set(key, { mat: b.mat, geos: [], cast: false, outline: !!o.userData.outline });
+    const bk = buckets.get(key);
+    bk.geos.push(g); if (o.castShadow) bk.cast = true;
   });
   const out = new THREE.Group();
   for (const b of buckets.values()) {
@@ -172,9 +203,8 @@ function bake(root) {
     if (!merged) continue;
     merged.computeBoundingSphere();
     const m = new THREE.Mesh(merged, b.mat);
-    m.castShadow = b.cast && settings.shadows; m.receiveShadow = !b.outline;
+    m.castShadow = b.cast && settings.shadows; m.receiveShadow = !b.outline && !b.mat.transparent;
     m.matrixAutoUpdate = false;
-    m.frustumCulled = false;
     out.add(m);
   }
   disposeTree(root);
@@ -183,7 +213,7 @@ function bake(root) {
 
 /* ---------- builders ---------- */
 let _shopMat, _shutMat, _atlasMat, _pitMat, _waterMat, _canalMat, _lakeMat, _riverMat;
-const pitMat = () => (_pitMat ??= new THREE.MeshBasicMaterial({ color: '#140e0a' }));
+const pitMat = () => (_pitMat ??= new THREE.MeshBasicMaterial({ color: '#1a100a' }));
 const shopMat = () => (_shopMat ??= new THREE.MeshBasicMaterial({ map: textures().shop }));
 const shutterMat = () => (_shutMat ??= std({ map: textures().shutter }));
 const atlasMat = () => (_atlasMat ??= new THREE.MeshBasicMaterial({ map: textures().atlas }));
@@ -201,10 +231,29 @@ const cell = (m, c, r) => {
 };
 const inside = (m, c, r) => r >= 0 && r < m.H && c >= 0 && c < m.W;
 const isFloor = ch => !isSolidTile(ch) && !isVoidTile(ch);
+const isWall = ch => ch === '#' || ch === 'K';
+const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+// Contact-shadow strip on the floor along the edge (dc, dr) of tile (c, r): dark at the wall, clear 18 px out.
+function aoStrip(c, r, dc, dr) {
+  const x0 = c * T, z0 = r * T, W = 18;
+  const g = new THREE.BufferGeometry();
+  let p, u;
+  if (dr === -1) { p = [x0, z0, x0 + T, z0, x0 + T, z0 + W, x0, z0 + W]; u = [0, 0, 1, 1]; }
+  else if (dr === 1) { p = [x0, z0 + T - W, x0 + T, z0 + T - W, x0 + T, z0 + T, x0, z0 + T]; u = [1, 1, 0, 0]; }
+  else if (dc === -1) { p = [x0, z0, x0 + W, z0, x0 + W, z0 + T, x0, z0 + T]; u = [0, 1, 1, 0]; }
+  else { p = [x0 + T - W, z0, x0 + T, z0, x0 + T, z0 + T, x0 + T - W, z0 + T]; u = [1, 0, 0, 1]; }
+  const pos = new Float32Array(12), uv = new Float32Array(8), nrm = new Float32Array(12);
+  for (let i = 0; i < 4; i++) { pos.set([p[i * 2], 1.2, p[i * 2 + 1]], i * 3); uv.set([u[i], 0.5], i * 2); nrm.set([0, 1, 0], i * 3); }
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  g.setIndex([0, 2, 1, 0, 3, 2]);
+  return new THREE.Mesh(g, aoMat());
+}
 
 function buildGround(root, m, th, holes, treeTiles) {
-  const grass = th.rain ? '#4f6a3e' : '#6f9a4a', dist = floorDist(m);
+  const grass = th.rain ? '#4f6a3e' : '#6f9a4a';
   const holeAt = (c, r) => holes.some(h => c * T + T / 2 > h.x && c * T + T / 2 < h.x + h.w && r * T + T / 2 > h.z && r * T + T / 2 < h.z + h.d);
+  const pitAt = (c, r) => cell(m, c, r) === ' ' || holeAt(c, r);
   for (let r = -4; r < m.H + 4; r++) for (let c = -4; c < m.W + 4; c++) {
     const ch = cell(m, c, r), x = c * T + T / 2, z = r * T + T / 2;
     if (!inside(m, c, r)) {
@@ -222,8 +271,10 @@ function buildGround(root, m, th, holes, treeTiles) {
       root.add(new THREE.Mesh(box(T, 6, T), ch === 'H' ? lakeMat() : riverMat()).translateX(x).translateY(ch === 'H' ? -14 : -34).translateZ(z));
       continue;
     }
-    if (ch === ' ' || holeAt(c, r)) {
-      // pit: dark hole with dirt walls; in the rain levels it is a canal full of brown water
+    // dirt walls only where something next to this tile is a pit (they are invisible anywhere else)
+    const nearPit = N4.some(([dc, dr]) => pitAt(c + dc, r + dr));
+    if (pitAt(c, r)) {
+      // pit: deep hole with earth walls and a dark floor; in the rain levels it is a canal full of brown water
       const canal = ch === ' ' && !holeAt(c, r) && th.rain;
       root.add(new THREE.Mesh(box(T, 10, T), canal ? canalMat() : pitMat()).translateX(x).translateY(canal ? -20 : -200).translateZ(z));
       continue;
@@ -235,17 +286,19 @@ function buildGround(root, m, th, holes, treeTiles) {
       for (let k = -1; k <= 1; k++) root.add(part(box(vert ? 22 : 10, 30, vert ? 10 : 22), k ? '#ff7b25' : '#f5f5f5', { pos: [x + (vert ? k * 24 : 0), 15, z + (vert ? 0 : k * 24)] }));
       continue;
     }
-    if (isSolidTile(ch) && ch !== 'T') { if (inside(m, c, r) && dist(c, r) <= 2) root.add(part(box(T, 220, T), '#3e2c1f', { pos: [x, -110, z], outline: false, shadow: false })); continue; }
+    if (isWall(ch)) { if (inside(m, c, r) && nearPit) root.add(part(box(T, 220, T), dirtMat(), { pos: [x, -110, z], outline: false, shadow: false })); continue; }
     const kind = ch === '=' ? 'road' : ch === ',' || ch === 'T' ? 'grass' : 'walk';
     if (kind === 'grass') root.add(part(box(T, 40, T), grass, { pos: [x, -20, z], outline: false, receive: true, shadow: false }));
     else root.add(part(groundBox(x, z, kind === 'road' ? 256 : 96), groundMat(kind, th), { pos: [x, -20, z], outline: false, receive: true, shadow: false }));
-    // a continuous kerb wherever pavement or grass meets the road
-    if (kind !== 'road') for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      if (cell(m, c + dc, r + dr) !== '=' || holeAt(c + dc, r + dr)) continue;
-      root.add(part(box(dc ? 7 : T, 4, dc ? T : 7), '#d9d4cb', { pos: [x + dc * (T / 2 - 3.5), 2, z + dr * (T / 2 - 3.5)], outline: false, receive: true, shadow: false }));
+    for (const [dc, dr] of N4) {
+      const n = cell(m, c + dc, r + dr);
+      // a continuous kerb wherever pavement or grass meets the road
+      if (kind !== 'road' && n === '=' && !holeAt(c + dc, r + dr))
+        root.add(part(box(dc ? 7 : T, 4, dc ? T : 7), '#d9d4cb', { pos: [x + dc * (T / 2 - 3.5), 2, z + dr * (T / 2 - 3.5)], outline: false, receive: true, shadow: false }));
+      // contact shadow at the foot of every wall
+      if (isWall(n)) root.add(aoStrip(c, r, dc, dr));
     }
-    // dirt sides toward pits so holes have walls
-    root.add(part(box(T, 180, T), '#3e2c1f', { pos: [x, -130, z], outline: false, shadow: false }));
+    if (nearPit) root.add(part(box(T, 180, T), dirtMat(), { pos: [x, -130, z], outline: false, shadow: false }));
     if (ch === '~') root.add(new THREE.Mesh(box(T, 4, T), waterMat()).translateX(x).translateY(5).translateZ(z));
     if (kind === 'road') {
       // lane dashes along the longer road direction
@@ -254,10 +307,13 @@ function buildGround(root, m, th, holes, treeTiles) {
       if (horiz && !vert && (cell(m, c, r - 1) !== '=' && cell(m, c, r + 1) === '=')) root.add(part(box(40, 1, 4), '#ededed', { pos: [x, 0.6, z + T / 2], outline: false, shadow: false }));
       if (vert && !horiz && (cell(m, c - 1, r) !== '=' && cell(m, c + 1, r) === '=')) root.add(part(box(4, 1, 40), '#ededed', { pos: [x + T / 2, 0.6, z], outline: false, shadow: false }));
     }
-    if (ch === 'T' && !treeTiles.has(c + ',' + r)) { const t = makeTree(150 + hash(c * 31 + r) * 50); t.position.set(x, 0, z); t.scale.setScalar(0.75); root.add(t); }
+    if (ch === 'T' && !treeTiles.has(c + ',' + r)) { const t = makeTreeLite(170 + hash(c * 31 + r) * 50, hash(c * 7 + r * 13)); t.position.set(x, 0, z); t.rotation.y = hash(c + r * 99) * 6.28; t.scale.setScalar(0.8); root.add(t); }
   }
 }
 
+// Group the house tiles into buildings so the city reads as one continuous model instead of a grid of cubes:
+// tiles facing open ground become tube-house lots 1-3 tiles wide along the street, everything behind them
+// is merged into big block rectangles with one shared roofline.
 // How many tiles a cell is from the nearest open ground. Houses deeper than a screen's worth are never
 // seen (the camera only ever looks at the player, who is on open ground), so they are not built at all.
 function floorDist(m) {
@@ -266,7 +322,7 @@ function floorDist(m) {
   for (let r = R0; r < R0 + H; r++) for (let c = C0; c < C0 + W; c++) if (!isSolidTile(cell(m, c, r))) { d[K(c, r)] = 0; q.push([c, r]); }
   for (let i = 0; i < q.length; i++) {
     const [c, r] = q[i], v = d[K(c, r)] + 1;
-    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    for (const [dc, dr] of N4) {
       const cc = c + dc, rr = r + dr;
       if (cc < C0 || cc >= C0 + W || rr < R0 || rr >= R0 + H || d[K(cc, rr)] <= v) continue;
       d[K(cc, rr)] = v; q.push([cc, rr]);
@@ -276,9 +332,6 @@ function floorDist(m) {
 }
 const SEEN = 7; // tiles from the street still worth building
 
-// Group the house tiles into buildings so the city reads as one continuous model instead of a grid of cubes:
-// tiles facing open ground become tube-house lots 1-3 tiles wide along the street, everything behind them
-// is merged into big block rectangles with one shared roofline.
 function planLots(m, seed) {
   const C0 = -4, C1 = m.W + 4, R0 = -4, R1 = m.H + 4, dist = floorDist(m);
   const isHouse = (c, r) => c >= C0 && c < C1 && r >= R0 && r < R1 && cell(m, c, r) === '#' && dist(c, r) <= SEEN;
@@ -324,17 +377,31 @@ function gable(w, h, d) {
 }
 
 // A walled garden block: low wall, grass, a few trees. Keeps the city green and soft around the edges.
-function garden(root, L, x, z, W, D, th, rnd, low) {
+function garden(root, L, x, z, W, D, th, rnd, low, outside, m) {
   root.add(part(box(W, 16, D), th.walk, { pos: [x, 8, z], t: 1.2 }));
   root.add(part(box(W - 12, 2, D - 12), th.rain ? '#4f6a3e' : '#6f9a4a', { pos: [x, 17, z], outline: false, shadow: false }));
-  const n = Math.min(6, Math.max(1, Math.round(L.cw * L.rh / 2)));
+  const n = outside ? 1 : Math.min(3, Math.max(1, Math.round(L.cw * L.rh / 2)));
+  // a tree canopy south of a street would stand between the camera and the rider: those gardens get bushes
+  let hides = false;
+  for (let c = L.c; c < L.c + L.cw; c++) if (isFloor(cell(m, c, L.r - 1)) || isFloor(cell(m, c, L.r - 2))) hides = true;
+  if (hides) {
+    for (let i = 0; i < n + 1; i++) {
+      const b = part(ico(13 + rnd(70 + i) * 7, 0), ['#3f8f3f', '#4fa34f', '#5bb35b'][i % 3], { pos: [x + (rnd(80 + i) - 0.5) * (W - 50), 24, z + (rnd(90 + i) - 0.5) * (D - 50)], outline: false });
+      b.rotation.set(rnd(81 + i) * 3, rnd(82 + i) * 3, 0); root.add(b);
+    }
+    return;
+  }
   for (let i = 0; i < n; i++) {
-    const t = makeTree(140 + rnd(70 + i) * 70);
-    t.position.set(x + (rnd(80 + i) - 0.5) * (W - 60), 16, z + (rnd(90 + i) - 0.5) * (D - 60));
-    t.rotation.y = rnd(100 + i) * 6.28; t.scale.setScalar((low ? 0.45 : 0.7) + rnd(110 + i) * 0.25);
+    const t = makeTreeLite(160 + rnd(70 + i) * 70, rnd(75 + i));
+    t.position.set(x + (rnd(80 + i) - 0.5) * (W - 70), 16, z + (rnd(90 + i) - 0.5) * (D - 70));
+    t.rotation.y = rnd(100 + i) * 6.28; t.scale.setScalar((low ? 0.5 : 0.75) + rnd(110 + i) * 0.25);
     root.add(t);
   }
 }
+
+// Roof colour: the wall colour pulled toward weathered concrete, so roofs read as a different surface
+// than walls and the lit street stays the brightest thing on screen.
+const roofOf = wall => '#' + new THREE.Color(wall).lerp(new THREE.Color('#857f78'), 0.62).getHexString();
 
 function buildHouses(root, m, th, seed) {
   const T_ = textures();
@@ -346,20 +413,19 @@ function buildHouses(root, m, th, seed) {
     root.add(part(box(T, 6, T), ['#e63946', '#2a9d8f', '#f4a300', '#1d6fd8'][Math.floor(k * 4)], { pos: [x, 52, z], rot: [0.12, 0, 0] }));
   }
   const ROOF = ['#c8553d', '#b5482f', '#d9784a', '#8f4a3a'];
-  planLots(m, seed).forEach((L, li) => {
+  planLots(m, seed).forEach((L) => {
     const rnd = k => hash(seed * 977 + (L.c + 7) * 131 + (L.r + 7) * 7919 + k * 17);
     const W = L.cw * T, D = L.rh * T, x = L.c * T + W / 2, z = L.r * T + D / 2;
     const outside = !inside(m, L.c, L.r);
-    // houses on the camera side of a walkable tile stay low so they never hide the rider
-    // blocks in front of the camera stay low; some blocks are little gardens full of trees
+    // houses on the camera side of a walkable tile stay low so they never hide the rider;
+    // some blocks are little gardens full of trees
     const south = L.block && L.r >= m.H - 1;
-    if (L.block && L.cw * L.rh >= 2 && rnd(1) < 0.42) { garden(root, L, x, z, W, D, th, rnd, south); return; }
+    if (L.block && L.cw * L.rh >= 2 && rnd(1) < 0.42) { garden(root, L, x, z, W, D, th, rnd, south, outside, m); return; }
     const h = L.front ? 44 + Math.floor(rnd(2) * 2) * 14
       : south ? 50 + Math.floor(rnd(2) * 2) * 16
       : L.block ? 60 + Math.floor(rnd(2) * 3) * 20
       : (outside ? 130 : 96) + Math.floor(rnd(2) * 4) * 26;
     const wall = th.houses[Math.floor(rnd(3) * th.houses.length)];
-    const color = L.block ? '#' + new THREE.Color(wall).lerp(new THREE.Color('#ffffff'), 0.3).getHexString() : wall;
     root.add(part(box(W, h, D), wall, { pos: [x, h / 2, z], t: 1.6 }));
     const fm = facadeMat(T_.facade[Math.floor(rnd(5) * 2)], wall);
     const floors = Math.max(0, Math.floor((h - 60) / 48));
@@ -381,7 +447,7 @@ function buildHouses(root, m, th, seed) {
       }
       root.add(g);
     }
-    // one roof per building: a tiled gable on some street lots, a flat terrace with clutter on the rest
+    // one roof per building: a tiled gable on some street lots, a flat terrace with a parapet on the rest
     if (!L.block && !L.front && rnd(30) < 0.35) {
       const along = L.cw >= L.rh, gw = (along ? W : D) + 6, gd = (along ? D : W) + 10;
       const roof = part(gable(gw, Math.min(32, gd * 0.36), gd), ROOF[Math.floor(rnd(31) * ROOF.length)], { pos: [x, h, z] });
@@ -389,13 +455,23 @@ function buildHouses(root, m, th, seed) {
       root.add(roof);
       return;
     }
-    root.add(part(box(W + 4, 6, D + 4), color, { pos: [x, h + 3, z], outline: false }));
-    const area = L.cw * L.rh, items = L.block ? Math.min(3, area) : 1;
+    root.add(part(box(W - 2, 4, D - 2), roofOf(wall), { pos: [x, h + 2, z], outline: false }));
+    root.add(part(box(W + 4, 9, 6), wall, { pos: [x, h + 4.5, z - D / 2 - 1], outline: false }));
+    root.add(part(box(W + 4, 9, 6), wall, { pos: [x, h + 4.5, z + D / 2 + 1], outline: false }));
+    root.add(part(box(6, 9, D - 2), wall, { pos: [x - W / 2 - 1, h + 4.5, z], outline: false }));
+    root.add(part(box(6, 9, D - 2), wall, { pos: [x + W / 2 + 1, h + 4.5, z], outline: false }));
+    // rooftop clutter on about half the roofs: a water tank, a box unit, a potted plant or a clothes line
+    const items = L.block ? Math.min(2, L.cw * L.rh) : 1;
     for (let i = 0; i < items; i++) {
-      const ox = (rnd(40 + i) - 0.5) * (W - 50), oz = (rnd(50 + i) - 0.5) * (D - 50), pick = rnd(60 + i);
-      if (pick < 0.4) { root.add(part(cyl(13, 13, 26, 12), '#3d7fd1', { pos: [x + ox, h + 13, z + oz] })); root.add(part(cyl(14, 14, 3, 12), '#e8e8e8', { pos: [x + ox, h + 27, z + oz], outline: false })); }
-      else if (pick < 0.7) root.add(part(box(22, 14, 14), '#e8ecef', { pos: [x + ox, h + 7, z + oz] }));
-      else if (pick < 0.9) root.add(part(ico(12, 0), '#4fa34f', { pos: [x + ox, h + 11, z + oz] }));
+      const ox = (rnd(40 + i) - 0.5) * (W - 54), oz = (rnd(50 + i) - 0.5) * (D - 54), pick = rnd(60 + i);
+      if (pick < 0.13) { root.add(part(cyl(12, 12, 24, 8), '#3d7fd1', { pos: [x + ox, h + 16, z + oz], outline: false })); root.add(part(cyl(13, 13, 3, 8), '#e8e8e8', { pos: [x + ox, h + 29, z + oz], outline: false })); }
+      else if (pick < 0.27) root.add(part(box(22, 14, 14), '#e8ecef', { pos: [x + ox, h + 11, z + oz], outline: false }));
+      else if (pick < 0.4) root.add(part(ico(11, 0), '#4fa34f', { pos: [x + ox, h + 14, z + oz], outline: false }));
+      else if (pick < 0.52 && W >= T) {
+        for (const dx of [-24, 24]) root.add(part(cyl(1.2, 1.2, 26, 4), '#777', { pos: [x + ox + dx, h + 17, z + oz], outline: false }));
+        root.add(part(box(48, 0.8, 0.8), '#555', { pos: [x + ox, h + 29, z + oz], outline: false }));
+        for (let k = 0; k < 3; k++) root.add(part(box(9, 12, 0.6), ['#e63946', '#4d7cfe', '#fff', '#f4a300'][Math.floor(rnd(70 + i * 3 + k) * 4)], { pos: [x + ox - 14 + k * 14, h + 23, z + oz], outline: false, shadow: false }));
+      }
     }
   });
 }
@@ -405,12 +481,83 @@ function buildProps(root, m, th, seed) {
   for (let r = 0; r < m.H; r++) for (let c = 0; c < m.W; c++) {
     if (m.cells[r][c] !== '.') continue;
     const rnd = k => hash(seed * 53 + c * 71 + r * 977 + k);
-    const wallUp = isSolidTile(cell(m, c, r - 1));
+    const wallUp = isWall(cell(m, c, r - 1));
     if (!wallUp || rnd(1) > 0.28) continue;
     const x = c * T + T / 2, z = r * T + 12;
     if (rnd(2) < 0.6) { const b = makeParkedBike(['#e63946', '#1d6fd8', '#f4f4f4', '#2b2b30', '#f4a300'][Math.floor(rnd(3) * 5)]); b.position.set(x, 0, z + 4); b.rotation.y = 0.15; b.scale.setScalar(0.8); root.add(b); }
-    else { root.add(part(cyl(9, 9, 16, 10), '#1d6fd8', { pos: [x, 8, z + 4] })); root.add(part(cyl(6, 6, 11, 8), '#e63946', { pos: [x + 18, 5, z + 6] })); }
+    else { root.add(part(cyl(9, 9, 16, 8), '#1d6fd8', { pos: [x, 8, z + 4] })); root.add(part(cyl(6, 6, 11, 6), '#e63946', { pos: [x + 18, 5, z + 6] })); }
   }
+}
+
+// Electric poles hugging the walls along every street, every five tiles, with sagging bundles of wire
+// between them: the wire spaghetti the game keeps launching you into.
+function buildWires(root, m) {
+  const POLE_H = 236, pts = [];
+  const pole = (x, z, rotY) => {
+    const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY;
+    g.add(part(cyl(3.5, 5.5, POLE_H, 6), '#9a9ea6', { pos: [0, POLE_H / 2, 0], outline: false }));
+    g.add(part(box(46, 5, 5), '#6d5a4a', { pos: [0, POLE_H - 14, 0], outline: false }));
+    for (const dx of [-19, 19]) g.add(part(cyl(2.4, 2.4, 8, 5), '#e8e2d0', { pos: [dx, POLE_H - 8, 0], outline: false }));
+    g.add(part(box(16, 22, 12), '#6b7b8c', { pos: [0, POLE_H * 0.62, 8], outline: false }));
+    root.add(g);
+  };
+  const wire = (ax, az, bx, bz, y, sag) => {
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 1) / n;
+      const s0 = y - Math.sin(t0 * Math.PI) * sag, s1 = y - Math.sin(t1 * Math.PI) * sag;
+      pts.push(ax + (bx - ax) * t0, s0, az + (bz - az) * t0, ax + (bx - ax) * t1, s1, az + (bz - az) * t1);
+    }
+  };
+  // along walls on the north side of east-west streets, and on the west side of north-south streets
+  const runs = [];
+  for (let r = 0; r < m.H; r++) {
+    let run = [];
+    for (let c = 0; c <= m.W; c++) {
+      const ok = c < m.W && isFloor(m.cells[r][c]) && isWall(cell(m, c, r - 1));
+      if (ok) run.push(c); else { if (run.length >= 3) runs.push({ r, cells: run }); run = []; }
+    }
+  }
+  const taken = new Set();
+  for (const { r, cells } of runs) {
+    const xs = [];
+    cells.forEach((c, i) => { if (i % 5 === 1 || (i === cells.length - 1 && i % 5 === 4)) { xs.push(c); taken.add(c + ',' + r); } });
+    xs.forEach((c, i) => {
+      const x = c * T + T / 2, z = r * T + 7;
+      pole(x, z, 0);
+      if (i + 1 < xs.length) {
+        const x2 = xs[i + 1] * T + T / 2, L = x2 - x;
+        for (const [dx, dy] of [[-19, 0], [19, 0], [-19, -6], [19, -6], [0, -40]]) wire(x + dx, z, x2 + dx, z, POLE_H - 8 + dy, L * (0.045 + Math.abs(dx) * 0.0006));
+      }
+    });
+  }
+  const vruns = [];
+  for (let c = 0; c < m.W; c++) {
+    let run = [];
+    for (let r = 0; r <= m.H; r++) {
+      const ok = r < m.H && isFloor(m.cells[r][c]) && isWall(cell(m, c - 1, r)) && !isWall(cell(m, c, r - 1));
+      if (ok) run.push(r); else { if (run.length >= 4) vruns.push({ c, cells: run }); run = []; }
+    }
+  }
+  for (const { c, cells } of vruns) {
+    const zs = [];
+    cells.forEach((r, i) => { if (i % 5 === 2 && !taken.has(c + ',' + r)) zs.push(r); });
+    zs.forEach((r, i) => {
+      const x = c * T + 7, z = r * T + T / 2;
+      pole(x, z, Math.PI / 2);
+      if (i + 1 < zs.length) {
+        const z2 = zs[i + 1] * T + T / 2, L = z2 - z;
+        for (const [dz, dy] of [[-19, 0], [19, 0], [0, -6], [0, -40]]) wire(x, z + dz, x, z2 + dz, POLE_H - 8 + dy, L * 0.05);
+      }
+    });
+  }
+  if (pts.length) {
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x1b1816 }));
+    lines.frustumCulled = false; lines.renderOrder = 1;
+    return lines;
+  }
+  return null;
 }
 
 /* ---------- sky & weather ---------- */
@@ -422,22 +569,25 @@ function skyTexture(th) {
   });
 }
 
+// Rain as thin vertical streaks (quads, not GL lines, so they stay visible on every screen) that follow the camera.
 function makeRain() {
-  const N = 700, pos = new Float32Array(N * 6), seed = [];
-  for (let i = 0; i < N; i++) seed.push([Math.random() * 1400 - 700, Math.random() * 700, Math.random() * 1100 - 600]);
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xcfe3f5, transparent: true, opacity: 0.5 }));
-  lines.frustumCulled = false;
-  lines.userData.update = (t, cx, cz) => {
+  const N = 520, pos = new Float32Array(N * 12), seed = [];
+  for (let i = 0; i < N; i++) seed.push([Math.random() * 1500 - 750, Math.random() * 700, Math.random() * 1200 - 650, 22 + Math.random() * 16]);
+  const idx = [];
+  for (let i = 0; i < N; i++) idx.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(idx);
+  const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xe4f0fb, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+  mesh.frustumCulled = false; mesh.renderOrder = 2;
+  mesh.userData.update = (t, cx, cz) => {
     for (let i = 0; i < N; i++) {
-      const s = seed[i];
-      const y = ((s[1] - t * 20) % 700 + 700) % 700 - 20;
+      const s = seed[i], h = s[3];
+      const y = ((s[1] - t * 22) % 700 + 700) % 700 - 20;
       const x = cx + s[0], z = cz + s[2];
-      pos.set([x, y, z, x - 3, y + 24, z], i * 6);
+      pos.set([x, y, z, x + 1.4, y, z, x - 2 + 1.4, y + h, z, x - 2, y + h, z], i * 12);
     }
     g.attributes.position.needsUpdate = true;
   };
-  return lines;
+  return mesh;
 }
 
 /* ---------- public ---------- */
@@ -452,6 +602,7 @@ export function buildWorld(level, ents, theme, map) {
   buildGround(raw, map, th, holes, treeTiles);
   buildHouses(raw, map, th, seed);
   buildProps(raw, map, th, seed);
+  const wires = buildWires(raw, map);
   // far ground around the city border (kept clear of the map itself so pits stay deep)
   const FW = map.W * T, FH = map.H * T, R = 3000;
   for (const [x0, z0, x1, z1] of [[-R, -R, FW + R, 0], [-R, FH, FW + R, FH + R], [-R, 0, 0, FH], [FW, 0, FW + R, FH]])
@@ -459,6 +610,7 @@ export function buildWorld(level, ents, theme, map) {
   const baked = bake(raw);
   const root = new THREE.Group();
   root.add(baked);
+  if (wires) root.add(wires);
   const rain = th.rain ? makeRain() : null;
   if (rain) root.add(rain);
   const sky = skyTexture(th);

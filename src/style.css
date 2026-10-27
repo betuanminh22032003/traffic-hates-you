@@ -161,7 +161,11 @@ h2 { margin: 0; font-size: clamp(30px, 6vw, 52px); color: var(--gold); letter-sp
 #rotate p { font-size: 22px; font-weight: 800; }
 #toast { position: fixed; left: 50%; bottom: calc(24px + var(--safe-b)); transform: translateX(-50%); background: var(--card); color: var(--ink);
   border: 3px solid var(--ink); border-radius: 14px; padding: 8px 16px 6px; font-weight: 800; z-index: 40; animation: fade .2s both; }
-#loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); font-size: 28px; font-weight: 800; color: var(--gold); z-index: 60; }
+#loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: radial-gradient(ellipse at 50% 40%, #3a2a22, var(--bg) 70%); font-weight: 800; color: var(--gold); z-index: 60; }
+#loading .logo.small .l1, #loading .logo.small .l2 { font-size: clamp(40px, 9vw, 72px); }
+#loading .load-bike { font-size: 40px; margin-top: 14px; animation: ride 0.7s ease-in-out infinite; }
+#loading .load-txt { font-size: clamp(16px, 2.6vw, 22px); color: var(--sky); text-shadow: 0 2px 0 var(--ink); animation: blink 1.2s steps(2) infinite; }
+@keyframes ride { 50% { transform: translateY(-5px) rotate(-6deg); } }
 
 @media (max-height: 460px) {
   .screen { gap: 8px; justify-content: flex-start; padding-top: calc(10px + var(--safe-t)); }

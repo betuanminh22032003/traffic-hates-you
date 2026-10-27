@@ -139,11 +139,21 @@ const V = {
     g.position.set(e.x, 0, e.z);
     // tip the +Y axis toward (dx, dz)
     const axis = new THREE.Vector3(e.dz, 0, -e.dx).normalize();
+    // a canopy standing between the camera and the rider turns see-through (own materials, faded per tree)
+    const canopy = [];
+    g.traverse(o => { if (o.userData.canopy) { o.material = own(o.material.clone()); o.material.transparent = true; canopy.push(o); } });
+    let fade = 1;
     return {
       obj: g,
-      update(e, w, t) {
+      update(e, w, t, dt) {
         const wob = e.st === 1 && e.wob > 0 ? Math.sin(t * 1.6) * 0.06 : 0;
         g.quaternion.setFromAxisAngle(axis, e.a + wob);
+        if (canopy.length) {
+          const dz = e.z - w.p.z, dx = e.x - w.p.x;
+          const want = e.st < 2 && dz > 10 && dz < 250 && Math.abs(dx) < 120 && w.status !== 'dead' ? 0.28 : 1;
+          fade += (want - fade) * Math.min(1, 0.2 * (dt || 1));
+          for (const c of canopy) { c.material.opacity = fade; c.material.depthWrite = fade > 0.9; c.castShadow = fade > 0.6; for (const k of c.children) if (k.userData.outline) k.visible = fade > 0.9; }
+        }
       },
       bubble(e) { if (e.st === 1 && e.wob > 0) return { s: e.kind === 'tree' ? 'rắc... rắc...' : 'kẽo kẹt...', x: e.x, y: e.len * 0.7, z: e.z, size: 15, plain: true }; },
       sparks: e.kind !== 'tree'
